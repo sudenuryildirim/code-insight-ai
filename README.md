@@ -1,18 +1,16 @@
 # CodeInsightAI
 
-Yapay zeka destekli kod inceleme aracı. Kaynak kodu analiz eder; kodun amacını açıklar, bug/güvenlik/performans/SOLID/Clean
-Code açısından sorunları tespit eder, çözüm önerileri sunar ve detaylı, indirilebilir bir PDF rapor üretir.
-Programlama dili kullanıcı tarafından seçilmez; yapay zeka dosya adı ve kod söz dizimine bakarak bunu kendisi tespit eder.
+Yapay zeka destekli GitHub pull request inceleme aracı. Bağlı bir GitHub reposundaki açık pull request'leri listeler;
+her biri için PR'ın amacını, olası bug/mantık hatalarını, güvenlik açıklarını (OWASP Top 10) ve projenin geri kalanıyla
+tutarlılığını değerlendiren detaylı bir rapor üretir, indirilebilir bir PDF olarak sunar.
 
-Ayrıca, bağlı bir GitHub reposundaki açık pull request'leri listeleyip her biri için amacını, doğruluğunu (bug taraması),
-güvenliğini (OWASP) ve projenin geri kalanıyla tutarlılığını değerlendiren bir rapor üretebilir. Bu modül **hiçbir zaman
-otomatik approve/merge yapmaz** — nihai karar her zaman GitHub üzerinde insan tarafından verilir.
+Bu modül **hiçbir zaman otomatik approve/merge yapmaz** — nihai karar her zaman GitHub üzerinde insan tarafından verilir.
 
 ## Proje yapısı
 
-- `backend/` - ASP.NET Core 9 (Clean Architecture: Domain / Application / Infrastructure / API), Google Gemini ile analiz,
-  QuestPDF ile PDF rapor üretimi.
-- `frontend-angular/` - Angular 18 arayüzü (kod yapıştırma/dosya yükleme, sonuç görüntüleme, PDF indirme).
+- `backend/` - ASP.NET Core 9 (Clean Architecture: Domain / Application / Infrastructure / API), GitHub REST API'den
+  PR diff'lerini çeker, Google Gemini ile analiz eder, QuestPDF ile PDF rapor üretir.
+- `frontend-angular/` - Angular 18 arayüzü (açık PR listesi, inceleme raporu görüntüleme, PDF indirme).
 - `frontend/` - önceki React/Vite arayüzü (artık kullanılmıyor, Angular ile değiştirildi).
 
 ## Çalıştırma
@@ -28,7 +26,7 @@ dotnet run
 API varsayılan olarak `http://localhost:5228` adresinde çalışır. Gemini API anahtarı `appsettings.json` /
 `appsettings.Development.json` içindeki `Gemini:ApiKey` alanından okunur.
 
-Pull request inceleme özelliğini kullanmak için `appsettings.Development.json` içine kendi değerlerinizi girin
+PR inceleme özelliğini kullanmak için `appsettings.Development.json` içine kendi değerlerinizi girin
 (bu dosya `.gitignore`'da olduğu için commit edilmez):
 
 ```json

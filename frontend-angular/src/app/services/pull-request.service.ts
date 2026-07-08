@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { PullRequestReport, PullRequestSummary } from '../models/report.model';
+import { CodeReviewReport, PullRequestReport, PullRequestSummary } from '../models/report.model';
 
 @Injectable({ providedIn: 'root' })
 export class PullRequestService {
@@ -16,5 +16,9 @@ export class PullRequestService {
 
   reviewPullRequest(number: number): Observable<PullRequestReport> {
     return this.http.post<PullRequestReport>(`${this.baseUrl}/${number}/review`, {});
+  }
+
+  downloadPdf(report: CodeReviewReport): Observable<Blob> {
+    return this.http.post(`${this.baseUrl}/report/pdf`, report, { responseType: 'blob' });
   }
 }

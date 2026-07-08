@@ -36,12 +36,6 @@ export interface CodeReviewReport {
   createdAt: string;
 }
 
-// Sent to the backend. Note: there is no "language" field - the AI detects it.
-export interface ReviewRequest {
-  code: string;
-  fileName: string;
-}
-
 export interface PullRequestSummary {
   number: number;
   title: string;

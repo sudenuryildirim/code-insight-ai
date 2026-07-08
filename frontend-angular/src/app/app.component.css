@@ -5,12 +5,23 @@
 }
 
 .page-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding-bottom: 24px;
   margin-bottom: 32px;
   border-bottom: 1px solid var(--border);
+}
+
+.page-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 180px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--gold), transparent);
 }
 
 .brand {
@@ -23,7 +34,7 @@
   width: 48px;
   height: 48px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--primary), #6366f1);
+  background: linear-gradient(135deg, var(--primary), #128a63);
   color: #ffffff;
   font-family: var(--font-display);
   font-weight: 800;
@@ -40,7 +51,7 @@
   position: absolute;
   inset: -1px;
   border-radius: 15px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.1));
+  background: linear-gradient(135deg, rgba(255, 223, 140, 0.4), rgba(255, 255, 255, 0.05));
   z-index: 1;
   pointer-events: none;
 }
@@ -68,37 +79,7 @@
 }
 
 /* Make sure elements enter with a nice transition */
-app-code-input, app-report-view, app-pull-request-list {
+app-report-view, app-pull-request-list {
   display: block;
   width: 100%;
-}
-
-.mode-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.mode-tab {
-  background: var(--surface-solid);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  padding: 10px 20px;
-  border-radius: 999px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.mode-tab:hover {
-  border-color: #cbd5e1;
-  transform: translateY(-1px);
-}
-
-.mode-tab.active {
-  background: linear-gradient(135deg, var(--primary), #6366f1);
-  border-color: var(--primary);
-  color: #ffffff;
-  box-shadow: 0 4px 10px var(--primary-glow);
 }

@@ -26,7 +26,7 @@
   <!-- Purpose + summary -->
   <div class="grid-2">
     <section class="panel">
-      <h3>Kodun Amacı</h3>
+      <h3>PR'ın Amacı</h3>
       <p class="text-block">{{ report.codePurpose || 'Bilgi bulunamadı.' }}</p>
     </section>
     <section class="panel">
@@ -66,27 +66,8 @@
     </ng-container>
   </div>
 
-  <!-- Code viewer + issue detail -->
-  <div class="grid-split" [class.grid-split-single]="!showCodeViewer">
-    <section class="panel code-panel" *ngIf="showCodeViewer">
-      <div class="panel-header">
-        <h3>{{ report.fileName || 'Kaynak Kod' }}</h3>
-        <span class="chip chip-info">{{ report.issues.length }} bulgu</span>
-      </div>
-      <div class="code-viewer">
-        <div
-          *ngFor="let line of code.split('\n'); let i = index"
-          class="code-line"
-          [ngClass]="lineHighlightClass(i + 1)"
-          (click)="onCodeLineClick(i + 1)"
-        >
-          <span class="line-num">{{ i + 1 }}</span>
-          <span class="line-content">{{ line || ' ' }}</span>
-        </div>
-      </div>
-      <p class="hint">Renkli satırlar tespit edilen sorunları gösterir. Bir satıra tıklayarak detayını görebilirsiniz.</p>
-    </section>
-
+  <!-- Issue detail + list -->
+  <div class="grid-split grid-split-single">
     <div class="side-column">
       <!-- Selected issue detail -->
       <section class="panel issue-detail" *ngIf="selectedIssue; else noSelection">
@@ -94,7 +75,7 @@
           <div>
             <span class="badge" [ngClass]="severityBadgeClass(selectedIssue.severity)">{{ selectedIssue.severity }}</span>
             <span class="chip chip-muted">{{ categoryLabel(selectedIssue.category) }}</span>
-            <span class="chip chip-muted" *ngIf="!showCodeViewer">{{ selectedIssue.filePath }}</span>
+            <span class="chip chip-muted">{{ selectedIssue.filePath }}</span>
           </div>
           <span class="line-ref">Satır {{ selectedIssue.lineNumber }}</span>
         </div>
@@ -121,7 +102,7 @@
 
       <ng-template #noSelection>
         <section class="panel empty-detail">
-          <p>Detayını görmek için soldaki kodda vurgulanmış bir satıra ya da aşağıdaki listeden bir bulguya tıklayın.</p>
+          <p>Detayını görmek için aşağıdaki listeden bir bulguya tıklayın.</p>
         </section>
       </ng-template>
 
@@ -142,7 +123,7 @@
             </div>
             <span class="issue-title">{{ issue.title }}</span>
             <span class="chip chip-muted">{{ categoryLabel(issue.category) }}</span>
-            <span class="chip chip-muted" *ngIf="!showCodeViewer">{{ issue.filePath }}</span>
+            <span class="chip chip-muted">{{ issue.filePath }}</span>
           </button>
 
           <p class="empty-note" *ngIf="filteredIssues.length === 0">Seçili kategoride sorun bulunmuyor.</p>
