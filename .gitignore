@@ -1,0 +1,14 @@
+# .NET
+backend/**/bin/
+backend/**/obj/
+backend/**/.vs/
+backend/CodeInsightAI.API/appsettings.Development.json
+
+# Angular
+frontend-angular/node_modules/
+frontend-angular/dist/
+frontend-angular/.angular/
+
+# Editor/OS
+.vs/
+*.user

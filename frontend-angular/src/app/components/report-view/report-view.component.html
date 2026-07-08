@@ -1,0 +1,161 @@
+<div class="report">
+  <!-- Top summary -->
+  <section class="panel summary-panel">
+    <div class="score-block" [ngClass]="scoreClass">
+      <span class="score-value">{{ report.score }}</span>
+      <span class="score-label">/ 100</span>
+    </div>
+
+    <div class="summary-body">
+      <div class="summary-head">
+        <div>
+          <span class="chip chip-info">{{ report.detectedLanguage || 'Dil tespit edilemedi' }}</span>
+          <h2>{{ report.fileName || 'Kod Kalite Raporu' }}</h2>
+        </div>
+        <div class="summary-actions">
+          <button type="button" class="btn btn-ghost" (click)="onReset()">{{ resetLabel }}</button>
+          <button type="button" class="btn btn-primary" [disabled]="pdfLoading" (click)="downloadPdf()">
+            {{ pdfLoading ? 'PDF Hazırlanıyor…' : 'PDF Olarak İndir' }}
+          </button>
+        </div>
+      </div>
+      <p class="error-box" *ngIf="pdfError">{{ pdfError }}</p>
+    </div>
+  </section>
+
+  <!-- Purpose + summary -->
+  <div class="grid-2">
+    <section class="panel">
+      <h3>Kodun Amacı</h3>
+      <p class="text-block">{{ report.codePurpose || 'Bilgi bulunamadı.' }}</p>
+    </section>
+    <section class="panel">
+      <h3>Genel Değerlendirme</h3>
+      <p class="text-block">{{ report.summary || 'Bilgi bulunamadı.' }}</p>
+    </section>
+  </div>
+
+  <!-- Strengths -->
+  <section class="panel" *ngIf="report.strengths?.length">
+    <h3>Güçlü Yönler</h3>
+    <ul class="bullet-list bullet-success">
+      <li *ngFor="let item of report.strengths">{{ item }}</li>
+    </ul>
+  </section>
+
+  <!-- Category filters -->
+  <div class="filter-row">
+    <button
+      type="button"
+      class="filter-chip"
+      [class.active]="selectedCategory === null"
+      (click)="selectCategory(null)"
+    >
+      Tüm Bulgular <span class="count">{{ report.issues.length }}</span>
+    </button>
+    <ng-container *ngFor="let category of categoryOrder">
+      <button
+        *ngIf="(categoryCounts[category] ?? 0) > 0"
+        type="button"
+        class="filter-chip"
+        [class.active]="selectedCategory === category"
+        (click)="selectCategory(category)"
+      >
+        {{ categoryLabel(category) }} <span class="count">{{ categoryCounts[category] }}</span>
+      </button>
+    </ng-container>
+  </div>
+
+  <!-- Code viewer + issue detail -->
+  <div class="grid-split" [class.grid-split-single]="!showCodeViewer">
+    <section class="panel code-panel" *ngIf="showCodeViewer">
+      <div class="panel-header">
+        <h3>{{ report.fileName || 'Kaynak Kod' }}</h3>
+        <span class="chip chip-info">{{ report.issues.length }} bulgu</span>
+      </div>
+      <div class="code-viewer">
+        <div
+          *ngFor="let line of code.split('\n'); let i = index"
+          class="code-line"
+          [ngClass]="lineHighlightClass(i + 1)"
+          (click)="onCodeLineClick(i + 1)"
+        >
+          <span class="line-num">{{ i + 1 }}</span>
+          <span class="line-content">{{ line || ' ' }}</span>
+        </div>
+      </div>
+      <p class="hint">Renkli satırlar tespit edilen sorunları gösterir. Bir satıra tıklayarak detayını görebilirsiniz.</p>
+    </section>
+
+    <div class="side-column">
+      <!-- Selected issue detail -->
+      <section class="panel issue-detail" *ngIf="selectedIssue; else noSelection">
+        <div class="issue-detail-head">
+          <div>
+            <span class="badge" [ngClass]="severityBadgeClass(selectedIssue.severity)">{{ selectedIssue.severity }}</span>
+            <span class="chip chip-muted">{{ categoryLabel(selectedIssue.category) }}</span>
+            <span class="chip chip-muted" *ngIf="!showCodeViewer">{{ selectedIssue.filePath }}</span>
+          </div>
+          <span class="line-ref">Satır {{ selectedIssue.lineNumber }}</span>
+        </div>
+
+        <h4>{{ selectedIssue.title }}</h4>
+
+        <pre class="code-block" *ngIf="selectedIssue.lineContent">{{ selectedIssue.lineContent }}</pre>
+
+        <div class="detail-block">
+          <h5>Sorun Açıklaması</h5>
+          <p>{{ selectedIssue.description }}</p>
+        </div>
+
+        <div class="detail-block">
+          <h5>Çözüm Önerisi</h5>
+          <p>{{ selectedIssue.suggestion }}</p>
+        </div>
+
+        <div class="detail-block" *ngIf="selectedIssue.refactoredCode">
+          <h5>Önerilen Refactor Kodu</h5>
+          <pre class="code-block code-block-dark">{{ selectedIssue.refactoredCode }}</pre>
+        </div>
+      </section>
+
+      <ng-template #noSelection>
+        <section class="panel empty-detail">
+          <p>Detayını görmek için soldaki kodda vurgulanmış bir satıra ya da aşağıdaki listeden bir bulguya tıklayın.</p>
+        </section>
+      </ng-template>
+
+      <!-- Issue list -->
+      <section class="panel issue-list">
+        <h4>Bulgular ({{ filteredIssues.length }})</h4>
+        <div class="issue-scroll">
+          <button
+            type="button"
+            class="issue-item"
+            *ngFor="let issue of filteredIssues"
+            [class.active]="selectedIssue === issue"
+            (click)="selectIssue(issue)"
+          >
+            <div class="issue-item-head">
+              <span class="badge" [ngClass]="severityBadgeClass(issue.severity)">{{ issue.severity }}</span>
+              <span class="line-ref">Satır {{ issue.lineNumber }}</span>
+            </div>
+            <span class="issue-title">{{ issue.title }}</span>
+            <span class="chip chip-muted">{{ categoryLabel(issue.category) }}</span>
+            <span class="chip chip-muted" *ngIf="!showCodeViewer">{{ issue.filePath }}</span>
+          </button>
+
+          <p class="empty-note" *ngIf="filteredIssues.length === 0">Seçili kategoride sorun bulunmuyor.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Recommendations -->
+  <section class="panel" *ngIf="report.recommendations?.length">
+    <h3>Genel Öneriler</h3>
+    <ul class="bullet-list bullet-info">
+      <li *ngFor="let item of report.recommendations">{{ item }}</li>
+    </ul>
+  </section>
+</div>
