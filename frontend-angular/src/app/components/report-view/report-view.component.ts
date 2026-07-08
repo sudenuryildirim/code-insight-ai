@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { CodeReviewService } from '../../services/code-review.service';
+import { PullRequestService } from '../../services/pull-request.service';
 import { CodeReviewReport, IssueCategory, IssueSeverity, ReviewIssue } from '../../models/report.model';
 
 const SEVERITY_RANK: Record<IssueSeverity, number> = {
@@ -31,11 +31,7 @@ const CATEGORY_LABELS: Record<IssueCategory, string> = {
 })
 export class ReportViewComponent {
   @Input({ required: true }) report!: CodeReviewReport;
-  @Input() code = '';
-  // PR reports span multiple files, so there is no single source listing to highlight
-  // line-by-line against - the code viewer panel is hidden and issues show their file path instead.
-  @Input() showCodeViewer = true;
-  @Input() resetLabel = 'Yeni Analiz';
+  @Input() resetLabel = 'Listeye Dön';
 
   @Output() reset = new EventEmitter<void>();
 
@@ -56,7 +52,7 @@ export class ReportViewComponent {
     'General',
   ];
 
-  constructor(private readonly codeReviewService: CodeReviewService) {}
+  constructor(private readonly pullRequestService: PullRequestService) {}
 
   categoryLabel(category: IssueCategory): string {
     return CATEGORY_LABELS[category] ?? category;
@@ -96,20 +92,6 @@ export class ReportViewComponent {
     this.selectedIssue = issue;
   }
 
-  issuesForLine(lineNumber: number): ReviewIssue[] {
-    return this.report.issues.filter((issue) => issue.lineNumber === lineNumber);
-  }
-
-  lineHighlightClass(lineNumber: number): string {
-    const issues = this.issuesForLine(lineNumber);
-    if (issues.length === 0) return '';
-    const severities = issues.map((i) => i.severity);
-    if (severities.includes('Critical')) return 'line-critical';
-    if (severities.includes('Error')) return 'line-error';
-    if (severities.includes('Warning')) return 'line-warning';
-    return 'line-info';
-  }
-
   severityBadgeClass(severity: IssueSeverity): string {
     switch (severity) {
       case 'Critical':
@@ -127,24 +109,17 @@ export class ReportViewComponent {
     this.reset.emit();
   }
 
-  onCodeLineClick(lineNumber: number): void {
-    const issues = this.issuesForLine(lineNumber);
-    if (issues.length > 0) {
-      this.selectedIssue = issues[0];
-    }
-  }
-
   downloadPdf(): void {
     this.pdfLoading = true;
     this.pdfError = null;
 
-    this.codeReviewService.downloadPdf(this.report).subscribe({
+    this.pullRequestService.downloadPdf(this.report).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         const safeName = (this.report.fileName || 'rapor').replace(/\s+/g, '-');
         anchor.href = url;
-        anchor.download = `kod-inceleme-raporu-${safeName}.pdf`;
+        anchor.download = `pr-inceleme-raporu-${safeName}.pdf`;
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);

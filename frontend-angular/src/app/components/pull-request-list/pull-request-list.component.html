@@ -19,20 +19,26 @@
     <div class="pr-list" *ngIf="pullRequests.length > 0; else emptyState">
       <div class="pr-item" *ngFor="let pr of pullRequests">
         <div class="pr-item-main">
-          <span class="chip chip-info">#{{ pr.number }}</span>
+          <div class="pr-number-badge">#{{ pr.number }}</div>
           <div class="pr-item-body">
             <span class="pr-title">{{ pr.title }}</span>
-            <span class="pr-meta">{{ pr.author }} · {{ pr.headBranch }} → {{ pr.baseBranch }}</span>
+            <span class="pr-meta">
+              <span class="pr-author">{{ pr.author }}</span>
+              <span class="pr-branch-flow">{{ pr.headBranch }} <span class="arrow">→</span> {{ pr.baseBranch }}</span>
+            </span>
           </div>
         </div>
-        <button
-          type="button"
-          class="btn btn-primary"
-          [disabled]="reviewingNumber === pr.number"
-          (click)="reviewPullRequest(pr.number)"
-        >
-          {{ reviewingNumber === pr.number ? 'İnceleniyor…' : 'İncele' }}
-        </button>
+        <div class="pr-item-side">
+          <span class="pr-updated">{{ pr.updatedAt | date: 'd MMM, HH:mm' }}</span>
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="reviewingNumber === pr.number"
+            (click)="reviewPullRequest(pr.number)"
+          >
+            {{ reviewingNumber === pr.number ? 'İnceleniyor…' : 'İncele' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -43,11 +49,5 @@
 </ng-container>
 
 <ng-template #reportBlock>
-  <app-report-view
-    [report]="adaptedReport!"
-    [code]="''"
-    [showCodeViewer]="false"
-    resetLabel="Listeye Dön"
-    (reset)="backToList()"
-  ></app-report-view>
+  <app-report-view [report]="adaptedReport!" (reset)="backToList()"></app-report-view>
 </ng-template>
