@@ -1,0 +1,53 @@
+<ng-container *ngIf="!selectedReport; else reportBlock">
+  <section class="panel pr-panel">
+    <div class="panel-header">
+      <h3>Açık Pull Request'ler</h3>
+      <button type="button" class="btn btn-ghost" [disabled]="isLoadingList" (click)="loadPullRequests()">
+        {{ isLoadingList ? 'Yükleniyor…' : 'Yenile' }}
+      </button>
+    </div>
+
+    <p class="hint">
+      Listelenen PR'lar, backend'de yapılandırılmış GitHub reposundan canlı çekilir. "İncele" butonu, PR'ın amacını,
+      olası hata/güvenlik sorunlarını ve mevcut kodla tutarlılığını raporlar — onay veya merge işlemini bu sistem
+      yapmaz, karar her zaman sizindir.
+    </p>
+
+    <p class="error-box" *ngIf="listError">{{ listError }}</p>
+    <p class="error-box" *ngIf="reviewError">{{ reviewError }}</p>
+
+    <div class="pr-list" *ngIf="pullRequests.length > 0; else emptyState">
+      <div class="pr-item" *ngFor="let pr of pullRequests">
+        <div class="pr-item-main">
+          <span class="chip chip-info">#{{ pr.number }}</span>
+          <div class="pr-item-body">
+            <span class="pr-title">{{ pr.title }}</span>
+            <span class="pr-meta">{{ pr.author }} · {{ pr.headBranch }} → {{ pr.baseBranch }}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="reviewingNumber === pr.number"
+          (click)="reviewPullRequest(pr.number)"
+        >
+          {{ reviewingNumber === pr.number ? 'İnceleniyor…' : 'İncele' }}
+        </button>
+      </div>
+    </div>
+
+    <ng-template #emptyState>
+      <p class="empty-note" *ngIf="!isLoadingList && !listError">Şu anda açık pull request bulunmuyor.</p>
+    </ng-template>
+  </section>
+</ng-container>
+
+<ng-template #reportBlock>
+  <app-report-view
+    [report]="adaptedReport!"
+    [code]="''"
+    [showCodeViewer]="false"
+    resetLabel="Listeye Dön"
+    (reset)="backToList()"
+  ></app-report-view>
+</ng-template>

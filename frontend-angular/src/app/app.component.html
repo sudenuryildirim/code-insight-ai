@@ -1,0 +1,39 @@
+<div class="page">
+  <header class="page-header">
+    <div class="brand">
+      <div class="logo">CI</div>
+      <div>
+        <h1>CodeInsightAI</h1>
+        <span>Yapay Zeka Destekli Kod İnceleme Aracı</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="mode-tabs">
+    <button type="button" class="mode-tab" [class.active]="mode === 'code'" (click)="setMode('code')">
+      Kod Analizi
+    </button>
+    <button type="button" class="mode-tab" [class.active]="mode === 'pr'" (click)="setMode('pr')">
+      Pull Request İncele
+    </button>
+  </nav>
+
+  <main class="page-content">
+    <ng-container *ngIf="mode === 'code'">
+      <app-code-input
+        *ngIf="!report"
+        [code]="code"
+        [fileName]="fileName"
+        [isLoading]="isLoading"
+        [errorMessage]="errorMessage"
+        (codeChange)="code = $event"
+        (fileNameChange)="fileName = $event"
+        (analyze)="onAnalyze()"
+      ></app-code-input>
+
+      <app-report-view *ngIf="report" [report]="report" [code]="code" (reset)="onReset()"></app-report-view>
+    </ng-container>
+
+    <app-pull-request-list *ngIf="mode === 'pr'"></app-pull-request-list>
+  </main>
+</div>

@@ -1,0 +1,6 @@
+@CodeInsightAI.API_HostAddress = http://localhost:5228
+
+GET {{CodeInsightAI.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
