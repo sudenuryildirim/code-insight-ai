@@ -1,7 +1,13 @@
 <ng-container *ngIf="!selectedReport; else reportBlock">
   <section class="panel pr-panel">
     <div class="panel-header">
-      <h3>Açık Pull Request'ler</h3>
+      <div class="panel-title-row">
+        <h3>Açık Pull Request'ler</h3>
+        <span class="live-indicator" [class.live-indicator-on]="isLive">
+          <span class="live-dot"></span>
+          {{ isLive ? 'Canlı' : 'Bağlanıyor…' }}
+        </span>
+      </div>
       <button type="button" class="btn btn-ghost" [disabled]="isLoadingList" (click)="loadPullRequests()">
         {{ isLoadingList ? 'Yükleniyor…' : 'Yenile' }}
       </button>
@@ -49,5 +55,24 @@
 </ng-container>
 
 <ng-template #reportBlock>
+  <div class="review-history-bar">
+    <div class="history-chips" *ngIf="reviewHistory.length > 1">
+      <span class="history-label">Geçmiş İncelemeler</span>
+      <button
+        type="button"
+        class="history-chip"
+        *ngFor="let entry of reviewHistory"
+        [class.active]="entry.id === selectedReport?.id"
+        (click)="selectHistoryEntry(entry)"
+      >
+        <span class="history-score">{{ entry.reliabilityScore }}</span>
+        <span class="history-date">{{ entry.createdAt | date: 'd MMM, HH:mm' }}</span>
+      </button>
+    </div>
+    <button type="button" class="btn btn-ghost reanalyze-btn" [disabled]="isReanalyzing" (click)="reanalyze()">
+      {{ isReanalyzing ? 'Yeniden Analiz Ediliyor…' : 'Yeniden Analiz Et' }}
+    </button>
+  </div>
+
   <app-report-view [report]="adaptedReport!" (reset)="backToList()"></app-report-view>
 </ng-template>

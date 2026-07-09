@@ -26,5 +26,6 @@ public class PullRequestDiffContext
     public string Author { get; set; } = string.Empty;
     public string BaseBranch { get; set; } = string.Empty;
     public string HeadBranch { get; set; } = string.Empty;
+    public string HeadSha { get; set; } = string.Empty;
     public List<PullRequestFileChange> Files { get; set; } = new();
 }

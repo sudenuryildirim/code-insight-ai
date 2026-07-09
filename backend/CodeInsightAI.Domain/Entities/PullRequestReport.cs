@@ -13,6 +13,12 @@ public class PullRequestReport
     public string HeadBranch { get; set; } = string.Empty;
 
     /// <summary>
+    /// The commit SHA this review was generated against. Used to detect whether a cached
+    /// review is still valid for the PR's current state.
+    /// </summary>
+    public string HeadSha { get; set; } = string.Empty;
+
+    /// <summary>
     /// What this PR is trying to achieve, inferred by the AI from the title, description and diff.
     /// </summary>
     public string DetectedPurpose { get; set; } = string.Empty;

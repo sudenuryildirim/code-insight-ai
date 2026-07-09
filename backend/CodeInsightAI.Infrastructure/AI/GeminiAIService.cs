@@ -153,6 +153,7 @@ Değişen dosyalar ({context.Files.Count} adet):
             report.Author = context.Author;
             report.BaseBranch = context.BaseBranch;
             report.HeadBranch = context.HeadBranch;
+            report.HeadSha = context.HeadSha;
             report.CreatedAt = DateTime.UtcNow;
 
             return report;

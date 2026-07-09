@@ -4,6 +4,45 @@
   gap: 16px;
 }
 
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.live-indicator-on {
+  color: var(--success-text);
+}
+
+.live-indicator-on .live-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-light);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .pr-list {
   display: flex;
   flex-direction: column;
@@ -116,4 +155,64 @@
   .pr-item-side {
     justify-content: space-between;
   }
+}
+
+/* Review history bar (above the report view) */
+.review-history-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.history-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+
+.history-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.history-chip:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.history-chip.active {
+  background: linear-gradient(135deg, var(--primary), #128a63);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.history-score {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.history-date {
+  opacity: 0.85;
 }

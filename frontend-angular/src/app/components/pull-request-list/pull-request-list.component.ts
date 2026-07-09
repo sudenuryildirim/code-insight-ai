@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { PullRequestService } from '../../services/pull-request.service';
+import { PullRequestLiveService } from '../../services/pull-request-live.service';
 import { ReportViewComponent } from '../report-view/report-view.component';
 import { CodeReviewReport, PullRequestReport, PullRequestSummary } from '../../models/report.model';
 
@@ -11,7 +13,7 @@ import { CodeReviewReport, PullRequestReport, PullRequestSummary } from '../../m
   templateUrl: './pull-request-list.component.html',
   styleUrl: './pull-request-list.component.css',
 })
-export class PullRequestListComponent implements OnInit {
+export class PullRequestListComponent implements OnInit, OnDestroy {
   pullRequests: PullRequestSummary[] = [];
   isLoadingList = false;
   listError: string | null = null;
@@ -19,11 +21,34 @@ export class PullRequestListComponent implements OnInit {
   reviewingNumber: number | null = null;
   reviewError: string | null = null;
   selectedReport: PullRequestReport | null = null;
+  reviewHistory: PullRequestReport[] = [];
+  isReanalyzing = false;
 
-  constructor(private readonly pullRequestService: PullRequestService) {}
+  isLive = false;
+  private readonly liveSubscriptions = new Subscription();
+
+  constructor(
+    private readonly pullRequestService: PullRequestService,
+    private readonly liveService: PullRequestLiveService,
+  ) {}
 
   ngOnInit(): void {
     this.loadPullRequests();
+
+    this.liveService.connect();
+    this.liveSubscriptions.add(this.liveService.connected.subscribe((connected) => (this.isLive = connected)));
+    this.liveSubscriptions.add(
+      this.liveService.pullRequestChanged.subscribe(() => {
+        // Only auto-refresh the list view - don't yank the user out of a report they're reading.
+        if (!this.selectedReport) {
+          this.loadPullRequests();
+        }
+      }),
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.liveSubscriptions.unsubscribe();
   }
 
   loadPullRequests(): void {
@@ -43,24 +68,49 @@ export class PullRequestListComponent implements OnInit {
     });
   }
 
-  reviewPullRequest(number: number): void {
-    this.reviewingNumber = number;
+  reviewPullRequest(number: number, force = false): void {
+    if (force) {
+      this.isReanalyzing = true;
+    } else {
+      this.reviewingNumber = number;
+    }
     this.reviewError = null;
 
-    this.pullRequestService.reviewPullRequest(number).subscribe({
+    this.pullRequestService.reviewPullRequest(number, force).subscribe({
       next: (report) => {
         this.selectedReport = report;
         this.reviewingNumber = null;
+        this.isReanalyzing = false;
+        this.loadHistory(number);
       },
       error: (err) => {
         this.reviewError = err?.error?.message ?? `PR #${number} incelenirken bir hata oluştu.`;
         this.reviewingNumber = null;
+        this.isReanalyzing = false;
       },
     });
   }
 
+  reanalyze(): void {
+    if (this.selectedReport) {
+      this.reviewPullRequest(this.selectedReport.prNumber, true);
+    }
+  }
+
+  loadHistory(number: number): void {
+    this.pullRequestService.getReviewHistory(number).subscribe({
+      next: (history) => (this.reviewHistory = history),
+      error: () => (this.reviewHistory = []),
+    });
+  }
+
+  selectHistoryEntry(entry: PullRequestReport): void {
+    this.selectedReport = entry;
+  }
+
   backToList(): void {
     this.selectedReport = null;
+    this.reviewHistory = [];
   }
 
   // The existing report-view component was built for single-file CodeReviewReport results;

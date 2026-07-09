@@ -58,6 +58,7 @@ export interface PullRequestReport {
   author: string;
   baseBranch: string;
   headBranch: string;
+  headSha: string;
   detectedPurpose: string;
   reliabilityScore: number;
   verdict: string;

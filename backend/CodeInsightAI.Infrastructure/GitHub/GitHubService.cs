@@ -93,6 +93,7 @@ public class GitHubService : IGitHubService
             Author = pr.User.Login,
             BaseBranch = pr.Base.Ref,
             HeadBranch = pr.Head.Ref,
+            HeadSha = pr.Head.Sha,
             Files = fileChanges
         };
     }

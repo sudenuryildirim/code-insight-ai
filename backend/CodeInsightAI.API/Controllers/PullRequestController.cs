@@ -34,17 +34,35 @@ public class PullRequestController : ControllerBase
 
     // Analyzes a single pull request's diff and returns a review report.
     // This never approves or merges anything on GitHub - the merge decision stays with a human.
+    // If a review already exists for the PR's current head commit, it's returned instantly
+    // without a new AI call - pass force=true to bypass that cache and re-analyze anyway.
     [HttpPost("{number:int}/review")]
-    public async Task<IActionResult> ReviewPullRequest(int number)
+    public async Task<IActionResult> ReviewPullRequest(int number, [FromQuery] bool force = false)
     {
         try
         {
-            var report = await _pullRequestReviewService.ReviewPullRequestAsync(number);
+            var report = await _pullRequestReviewService.ReviewPullRequestAsync(number, force);
             return Ok(report);
         }
         catch (Exception ex)
         {
             return StatusCode(500, new { message = "Pull request incelenirken sunucu hatası oluştu.", error = ex.Message });
+        }
+    }
+
+    // Returns up to the 10 most recent past reviews for this PR (newest first), so the UI can
+    // let a user jump back to an earlier report without re-running the analysis.
+    [HttpGet("{number:int}/history")]
+    public async Task<IActionResult> GetReviewHistory(int number)
+    {
+        try
+        {
+            var history = await _pullRequestReviewService.GetReviewHistoryAsync(number);
+            return Ok(history);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "İnceleme geçmişi alınırken sunucu hatası oluştu.", error = ex.Message });
         }
     }
 

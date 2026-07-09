@@ -3,6 +3,9 @@ backend/**/bin/
 backend/**/obj/
 backend/**/.vs/
 backend/CodeInsightAI.API/appsettings.Development.json
+backend/CodeInsightAI.API/*.db
+backend/CodeInsightAI.API/*.db-shm
+backend/CodeInsightAI.API/*.db-wal
 
 # Angular
 frontend-angular/node_modules/
