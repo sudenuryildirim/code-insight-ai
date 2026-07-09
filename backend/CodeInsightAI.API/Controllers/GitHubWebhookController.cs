@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using CodeInsightAI.API.Hubs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace CodeInsightAI.API.Controllers;
 
@@ -13,17 +15,20 @@ public class GitHubWebhookController : ControllerBase
 
     private readonly IConfiguration _configuration;
     private readonly ILogger<GitHubWebhookController> _logger;
+    private readonly IHubContext<PullRequestHub> _hubContext;
 
-    public GitHubWebhookController(IConfiguration configuration, ILogger<GitHubWebhookController> logger)
+    public GitHubWebhookController(IConfiguration configuration, ILogger<GitHubWebhookController> logger, IHubContext<PullRequestHub> hubContext)
     {
         _configuration = configuration;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     // Receives GitHub's pull_request webhook events. Signature-verified so only GitHub (or someone
-    // holding the configured secret) can call this. Doesn't take any action on GitHub itself - the
-    // PR list in the UI is always fetched live, this endpoint is a hook point for future real-time
-    // notifications (e.g. push updates), not something the review flow depends on today.
+    // holding the configured secret) can call this. Doesn't take any action on GitHub itself - it
+    // only pushes a "the PR list changed" notification to connected clients over SignalR so the UI
+    // can refresh itself without a manual "Yenile" click. The PR list is always re-fetched live from
+    // GitHub when that happens, so a missed or delayed notification never leaves stale data behind.
     [HttpPost("webhook")]
     public async Task<IActionResult> ReceiveWebhook()
     {
@@ -57,12 +62,15 @@ public class GitHubWebhookController : ControllerBase
         if (action != null && RelevantActions.Contains(action))
         {
             _logger.LogInformation("GitHub webhook: PR #{PrNumber} {Action}", prNumber, action);
+            await _hubContext.Clients.All.SendAsync("pullRequestChanged", new { prNumber, action });
         }
 
         return Ok(new { received = true });
     }
 
-    private static bool IsSignatureValid(string rawBody, string? signatureHeader, string secret)
+    // Internal (rather than private) so it can be unit-tested directly without spinning up
+    // a full HTTP pipeline just to exercise the HMAC comparison logic.
+    internal static bool IsSignatureValid(string rawBody, string? signatureHeader, string secret)
     {
         if (string.IsNullOrWhiteSpace(signatureHeader) || !signatureHeader.StartsWith("sha256="))
         {

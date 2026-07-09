@@ -9,8 +9,12 @@ Bu modül **hiçbir zaman otomatik approve/merge yapmaz** — nihai karar her za
 ## Proje yapısı
 
 - `backend/` - ASP.NET Core 9 (Clean Architecture: Domain / Application / Infrastructure / API), GitHub REST API'den
-  PR diff'lerini çeker, Google Gemini ile analiz eder, QuestPDF ile PDF rapor üretir.
-- `frontend-angular/` - Angular 18 arayüzü (açık PR listesi, inceleme raporu görüntüleme, PDF indirme).
+  PR diff'lerini çeker, Google Gemini ile analiz eder, QuestPDF ile PDF rapor üretir. İncelemeler SQLite'a
+  (`codeinsight.db`) kaydedilir; aynı commit için tekrar inceleme istenirse Gemini'ye gitmeden anında sonuç döner.
+  `CodeInsightAI.Tests` (xUnit) birim testlerini içerir.
+- `frontend-angular/` - Angular 18 arayüzü (açık PR listesi, inceleme raporu görüntüleme, geçmiş incelemeler,
+  PDF indirme). SignalR üzerinden backend'e bağlanır; GitHub webhook'u bir PR'ı güncellediğinde liste otomatik
+  yenilenir (bkz. "Gerçek zamanlı bildirim" altında).
 - `frontend/` - önceki React/Vite arayüzü (artık kullanılmıyor, Angular ile değiştirildi).
 
 ## Çalıştırma
@@ -38,10 +42,19 @@ PR inceleme özelliğini kullanmak için `appsettings.Development.json` içine k
 }
 ```
 
-PR listesi ve inceleme her zaman GitHub API'den canlı çekilir; webhook (`POST /api/github/webhook`) sadece
-imza doğrulaması yapıp event'i kabul eder, ileride gerçek zamanlı bildirim için kullanılabilir ama bugün
-listenin çalışması için gerekli değildir (local geliştirmede GitHub'ın webhook'a ulaşabilmesi için ngrok gibi
-bir tünel gerekir).
+PR listesi ve inceleme her zaman GitHub API'den canlı çekilir; webhook (`POST /api/github/webhook`) bu yüzden
+listenin çalışması için gerekli değildir — sadece isteğe bağlı bir hızlandırma katmanıdır (local geliştirmede
+GitHub'ın webhook'a ulaşabilmesi için ngrok gibi bir tünel gerekir).
+
+### Gerçek zamanlı bildirim (SignalR)
+
+Backend `/hubs/pull-requests` adresinde bir SignalR hub'ı yayınlar. Arayüz açılışta buna bağlanır ve üstte
+"Canlı" / "Bağlanıyor…" göstergesi gösterir. GitHub webhook'u imzası doğrulanmış bir `pull_request` event'i
+(`opened`/`synchronize`/`reopened`) aldığında, bu hub üzerinden tüm bağlı istemcilere bir bildirim yayınlar;
+arayüz bunu alınca (o an bir rapor görüntülenmiyorsa) PR listesini otomatik yeniler — elle "Yenile"ye
+basmaya gerek kalmaz. Test suite'inin webhook imza doğrulama testleri dışında, bu akışı local'de test etmek
+için GitHub'ın gerçek webhook çağrısı yerine imzalı bir `curl` isteği `POST /api/github/webhook`'a
+gönderilebilir.
 
 Frontend (Angular):
 

@@ -14,8 +14,13 @@ export class PullRequestService {
     return this.http.get<PullRequestSummary[]>(`${this.baseUrl}/open`);
   }
 
-  reviewPullRequest(number: number): Observable<PullRequestReport> {
-    return this.http.post<PullRequestReport>(`${this.baseUrl}/${number}/review`, {});
+  reviewPullRequest(number: number, force = false): Observable<PullRequestReport> {
+    const query = force ? '?force=true' : '';
+    return this.http.post<PullRequestReport>(`${this.baseUrl}/${number}/review${query}`, {});
+  }
+
+  getReviewHistory(number: number): Observable<PullRequestReport[]> {
+    return this.http.get<PullRequestReport[]>(`${this.baseUrl}/${number}/history`);
   }
 
   downloadPdf(report: CodeReviewReport): Observable<Blob> {

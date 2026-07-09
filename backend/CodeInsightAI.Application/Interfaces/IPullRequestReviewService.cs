@@ -7,5 +7,7 @@ public interface IPullRequestReviewService
 {
     Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync();
 
-    Task<PullRequestReport> ReviewPullRequestAsync(int prNumber);
+    Task<PullRequestReport> ReviewPullRequestAsync(int prNumber, bool forceRefresh = false);
+
+    Task<List<PullRequestReport>> GetReviewHistoryAsync(int prNumber);
 }
