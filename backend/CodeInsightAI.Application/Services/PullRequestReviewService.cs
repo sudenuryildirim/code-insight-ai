@@ -1,7 +1,6 @@
 using CodeInsightAI.Application.DTOs;
 using CodeInsightAI.Application.Interfaces;
 using CodeInsightAI.Domain.Entities;
-using Microsoft.Extensions.Configuration;
 
 namespace CodeInsightAI.Application.Services;
 
@@ -10,30 +9,30 @@ public class PullRequestReviewService : IPullRequestReviewService
     private readonly IGitHubService _gitHubService;
     private readonly IAIService _aiService;
     private readonly IPullRequestReviewRepository _repository;
-    private readonly string _owner;
-    private readonly string _repo;
 
     public PullRequestReviewService(
         IGitHubService gitHubService,
         IAIService aiService,
-        IPullRequestReviewRepository repository,
-        IConfiguration configuration)
+        IPullRequestReviewRepository repository)
     {
         _gitHubService = gitHubService;
         _aiService = aiService;
         _repository = repository;
-        _owner = configuration["GitHub:Owner"] ?? string.Empty;
-        _repo = configuration["GitHub:Repo"] ?? string.Empty;
     }
 
-    public Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync()
+    public List<RepositoryRef> GetConfiguredRepositories()
     {
-        return _gitHubService.GetOpenPullRequestsAsync();
+        return _gitHubService.GetConfiguredRepositories();
     }
 
-    public async Task<PullRequestReport> ReviewPullRequestAsync(int prNumber, bool forceRefresh = false)
+    public Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo)
     {
-        var context = await _gitHubService.GetPullRequestDiffAsync(prNumber);
+        return _gitHubService.GetOpenPullRequestsAsync(owner, repo);
+    }
+
+    public async Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false)
+    {
+        var context = await _gitHubService.GetPullRequestDiffAsync(owner, repo, prNumber);
 
         if (!forceRefresh)
         {
@@ -56,8 +55,8 @@ public class PullRequestReviewService : IPullRequestReviewService
         return report;
     }
 
-    public Task<List<PullRequestReport>> GetReviewHistoryAsync(int prNumber)
+    public Task<List<PullRequestReport>> GetReviewHistoryAsync(string owner, string repo, int prNumber)
     {
-        return _repository.GetReviewHistoryAsync(_owner, _repo, prNumber);
+        return _repository.GetReviewHistoryAsync(owner, repo, prNumber);
     }
 }

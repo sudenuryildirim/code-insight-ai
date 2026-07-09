@@ -36,6 +36,11 @@ export interface CodeReviewReport {
   createdAt: string;
 }
 
+export interface RepositoryRef {
+  owner: string;
+  repo: string;
+}
+
 export interface PullRequestSummary {
   number: number;
   title: string;

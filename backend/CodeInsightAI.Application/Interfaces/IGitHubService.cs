@@ -4,7 +4,9 @@ namespace CodeInsightAI.Application.Interfaces;
 
 public interface IGitHubService
 {
-    Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync();
+    List<RepositoryRef> GetConfiguredRepositories();
 
-    Task<PullRequestDiffContext> GetPullRequestDiffAsync(int prNumber);
+    Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo);
+
+    Task<PullRequestDiffContext> GetPullRequestDiffAsync(string owner, string repo, int prNumber);
 }

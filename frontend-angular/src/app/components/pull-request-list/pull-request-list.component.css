@@ -4,6 +4,37 @@
   gap: 16px;
 }
 
+.repo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -4px;
+}
+
+.repo-chip {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.repo-chip:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.repo-chip.active {
+  background: linear-gradient(135deg, var(--primary), #128a63);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
 .panel-title-row {
   display: flex;
   align-items: center;

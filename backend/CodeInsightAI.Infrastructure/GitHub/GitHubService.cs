@@ -14,8 +14,7 @@ public class GitHubService : IGitHubService
     private const int MaxFileSizeBytesForFullContent = 50_000;
 
     private readonly HttpClient _httpClient;
-    private readonly string _owner;
-    private readonly string _repo;
+    private readonly List<RepositoryRef> _repositories;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public GitHubService(HttpClient httpClient, IConfiguration configuration)
@@ -23,8 +22,7 @@ public class GitHubService : IGitHubService
         _httpClient = httpClient;
 
         var token = configuration["GitHub:Token"] ?? throw new InvalidOperationException("GitHub token is not configured.");
-        _owner = configuration["GitHub:Owner"] ?? throw new InvalidOperationException("GitHub repo owner is not configured.");
-        _repo = configuration["GitHub:Repo"] ?? throw new InvalidOperationException("GitHub repo name is not configured.");
+        _repositories = configuration.GetSection("GitHub:Repositories").Get<List<RepositoryRef>>() ?? new();
 
         _httpClient.BaseAddress = new Uri("https://api.github.com/");
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -33,9 +31,11 @@ public class GitHubService : IGitHubService
         _httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
     }
 
-    public async Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync()
+    public List<RepositoryRef> GetConfiguredRepositories() => _repositories;
+
+    public async Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo)
     {
-        var response = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/pulls?state=open&sort=updated&direction=desc");
+        var response = await _httpClient.GetAsync($"repos/{owner}/{repo}/pulls?state=open&sort=updated&direction=desc");
         response.EnsureSuccessStatusCode();
 
         var pulls = await response.Content.ReadFromJsonAsyncSafe<List<GitHubPullRequest>>(_jsonOptions) ?? new();
@@ -52,14 +52,14 @@ public class GitHubService : IGitHubService
         }).ToList();
     }
 
-    public async Task<PullRequestDiffContext> GetPullRequestDiffAsync(int prNumber)
+    public async Task<PullRequestDiffContext> GetPullRequestDiffAsync(string owner, string repo, int prNumber)
     {
-        var prResponse = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/pulls/{prNumber}");
+        var prResponse = await _httpClient.GetAsync($"repos/{owner}/{repo}/pulls/{prNumber}");
         prResponse.EnsureSuccessStatusCode();
         var pr = await prResponse.Content.ReadFromJsonAsyncSafe<GitHubPullRequest>(_jsonOptions)
             ?? throw new InvalidOperationException($"PR #{prNumber} bulunamadı.");
 
-        var filesResponse = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/pulls/{prNumber}/files?per_page=100");
+        var filesResponse = await _httpClient.GetAsync($"repos/{owner}/{repo}/pulls/{prNumber}/files?per_page=100");
         filesResponse.EnsureSuccessStatusCode();
         var files = await filesResponse.Content.ReadFromJsonAsyncSafe<List<GitHubPullRequestFile>>(_jsonOptions) ?? new();
 
@@ -76,7 +76,7 @@ public class GitHubService : IGitHubService
 
             if (fetchFullContent && file.Status != "removed")
             {
-                change.FullContent = await TryGetFileContentAsync(file.FileName, pr.Head.Sha);
+                change.FullContent = await TryGetFileContentAsync(owner, repo, file.FileName, pr.Head.Sha);
             }
 
             fileChanges.Add(change);
@@ -84,8 +84,8 @@ public class GitHubService : IGitHubService
 
         return new PullRequestDiffContext
         {
-            RepoOwner = _owner,
-            RepoName = _repo,
+            RepoOwner = owner,
+            RepoName = repo,
             PrNumber = pr.Number,
             PrTitle = pr.Title,
             PrDescription = pr.Body ?? string.Empty,
@@ -98,11 +98,11 @@ public class GitHubService : IGitHubService
         };
     }
 
-    private async Task<string> TryGetFileContentAsync(string path, string headSha)
+    private async Task<string> TryGetFileContentAsync(string owner, string repo, string path, string headSha)
     {
         try
         {
-            var response = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/contents/{Uri.EscapeDataString(path)}?ref={headSha}");
+            var response = await _httpClient.GetAsync($"repos/{owner}/{repo}/contents/{Uri.EscapeDataString(path)}?ref={headSha}");
             if (!response.IsSuccessStatusCode)
             {
                 return string.Empty;

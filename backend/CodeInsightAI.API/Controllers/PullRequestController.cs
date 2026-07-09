@@ -17,13 +17,20 @@ public class PullRequestController : ControllerBase
         _pdfReportGenerator = pdfReportGenerator;
     }
 
-    // Lists the currently open pull requests for the configured repo (GitHub:Owner/GitHub:Repo).
-    [HttpGet("open")]
-    public async Task<IActionResult> GetOpenPullRequests()
+    // Lists the repos configured under GitHub:Repositories, so the UI can offer a repo switcher.
+    [HttpGet("repos")]
+    public IActionResult GetConfiguredRepositories()
+    {
+        return Ok(_pullRequestReviewService.GetConfiguredRepositories());
+    }
+
+    // Lists the currently open pull requests for the given repo.
+    [HttpGet("{owner}/{repo}/open")]
+    public async Task<IActionResult> GetOpenPullRequests(string owner, string repo)
     {
         try
         {
-            var pullRequests = await _pullRequestReviewService.GetOpenPullRequestsAsync();
+            var pullRequests = await _pullRequestReviewService.GetOpenPullRequestsAsync(owner, repo);
             return Ok(pullRequests);
         }
         catch (Exception ex)
@@ -36,12 +43,12 @@ public class PullRequestController : ControllerBase
     // This never approves or merges anything on GitHub - the merge decision stays with a human.
     // If a review already exists for the PR's current head commit, it's returned instantly
     // without a new AI call - pass force=true to bypass that cache and re-analyze anyway.
-    [HttpPost("{number:int}/review")]
-    public async Task<IActionResult> ReviewPullRequest(int number, [FromQuery] bool force = false)
+    [HttpPost("{owner}/{repo}/{number:int}/review")]
+    public async Task<IActionResult> ReviewPullRequest(string owner, string repo, int number, [FromQuery] bool force = false)
     {
         try
         {
-            var report = await _pullRequestReviewService.ReviewPullRequestAsync(number, force);
+            var report = await _pullRequestReviewService.ReviewPullRequestAsync(owner, repo, number, force);
             return Ok(report);
         }
         catch (Exception ex)
@@ -52,12 +59,12 @@ public class PullRequestController : ControllerBase
 
     // Returns up to the 10 most recent past reviews for this PR (newest first), so the UI can
     // let a user jump back to an earlier report without re-running the analysis.
-    [HttpGet("{number:int}/history")]
-    public async Task<IActionResult> GetReviewHistory(int number)
+    [HttpGet("{owner}/{repo}/{number:int}/history")]
+    public async Task<IActionResult> GetReviewHistory(string owner, string repo, int number)
     {
         try
         {
-            var history = await _pullRequestReviewService.GetReviewHistoryAsync(number);
+            var history = await _pullRequestReviewService.GetReviewHistoryAsync(owner, repo, number);
             return Ok(history);
         }
         catch (Exception ex)

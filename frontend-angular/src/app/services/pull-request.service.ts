@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { CodeReviewReport, PullRequestReport, PullRequestSummary } from '../models/report.model';
+import { CodeReviewReport, PullRequestReport, PullRequestSummary, RepositoryRef } from '../models/report.model';
 
 @Injectable({ providedIn: 'root' })
 export class PullRequestService {
@@ -10,17 +10,21 @@ export class PullRequestService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getOpenPullRequests(): Observable<PullRequestSummary[]> {
-    return this.http.get<PullRequestSummary[]>(`${this.baseUrl}/open`);
+  getRepositories(): Observable<RepositoryRef[]> {
+    return this.http.get<RepositoryRef[]>(`${this.baseUrl}/repos`);
   }
 
-  reviewPullRequest(number: number, force = false): Observable<PullRequestReport> {
+  getOpenPullRequests(owner: string, repo: string): Observable<PullRequestSummary[]> {
+    return this.http.get<PullRequestSummary[]>(`${this.baseUrl}/${owner}/${repo}/open`);
+  }
+
+  reviewPullRequest(owner: string, repo: string, number: number, force = false): Observable<PullRequestReport> {
     const query = force ? '?force=true' : '';
-    return this.http.post<PullRequestReport>(`${this.baseUrl}/${number}/review${query}`, {});
+    return this.http.post<PullRequestReport>(`${this.baseUrl}/${owner}/${repo}/${number}/review${query}`, {});
   }
 
-  getReviewHistory(number: number): Observable<PullRequestReport[]> {
-    return this.http.get<PullRequestReport[]>(`${this.baseUrl}/${number}/history`);
+  getReviewHistory(owner: string, repo: string, number: number): Observable<PullRequestReport[]> {
+    return this.http.get<PullRequestReport[]>(`${this.baseUrl}/${owner}/${repo}/${number}/history`);
   }
 
   downloadPdf(report: CodeReviewReport): Observable<Blob> {

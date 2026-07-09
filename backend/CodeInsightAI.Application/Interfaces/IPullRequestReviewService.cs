@@ -5,9 +5,11 @@ namespace CodeInsightAI.Application.Interfaces;
 
 public interface IPullRequestReviewService
 {
-    Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync();
+    List<RepositoryRef> GetConfiguredRepositories();
 
-    Task<PullRequestReport> ReviewPullRequestAsync(int prNumber, bool forceRefresh = false);
+    Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo);
 
-    Task<List<PullRequestReport>> GetReviewHistoryAsync(int prNumber);
+    Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false);
+
+    Task<List<PullRequestReport>> GetReviewHistoryAsync(string owner, string repo, int prNumber);
 }

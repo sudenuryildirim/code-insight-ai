@@ -13,12 +13,25 @@
       </button>
     </div>
 
+    <div class="repo-chips" *ngIf="repositories.length > 1">
+      <button
+        type="button"
+        class="repo-chip"
+        *ngFor="let repository of repositories"
+        [class.active]="repository === selectedRepo"
+        (click)="selectRepo(repository)"
+      >
+        {{ repository.owner }}/{{ repository.repo }}
+      </button>
+    </div>
+
     <p class="hint">
       Listelenen PR'lar, backend'de yapılandırılmış GitHub reposundan canlı çekilir. "İncele" butonu, PR'ın amacını,
       olası hata/güvenlik sorunlarını ve mevcut kodla tutarlılığını raporlar — onay veya merge işlemini bu sistem
       yapmaz, karar her zaman sizindir.
     </p>
 
+    <p class="error-box" *ngIf="reposError">{{ reposError }}</p>
     <p class="error-box" *ngIf="listError">{{ listError }}</p>
     <p class="error-box" *ngIf="reviewError">{{ reviewError }}</p>
 

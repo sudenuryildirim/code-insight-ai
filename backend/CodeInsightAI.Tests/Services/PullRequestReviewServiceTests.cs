@@ -2,7 +2,6 @@ using CodeInsightAI.Application.DTOs;
 using CodeInsightAI.Application.Interfaces;
 using CodeInsightAI.Application.Services;
 using CodeInsightAI.Domain.Entities;
-using Microsoft.Extensions.Configuration;
 using Moq;
 
 namespace CodeInsightAI.Tests.Services;
@@ -19,11 +18,7 @@ public class PullRequestReviewServiceTests
 
     public PullRequestReviewServiceTests()
     {
-        var configuration = new Mock<IConfiguration>();
-        configuration.Setup(c => c["GitHub:Owner"]).Returns(Owner);
-        configuration.Setup(c => c["GitHub:Repo"]).Returns(Repo);
-
-        _service = new PullRequestReviewService(_gitHubService.Object, _aiService.Object, _repository.Object, configuration.Object);
+        _service = new PullRequestReviewService(_gitHubService.Object, _aiService.Object, _repository.Object);
     }
 
     private static PullRequestDiffContext MakeContext(int prNumber, string headSha)
@@ -44,10 +39,10 @@ public class PullRequestReviewServiceTests
         var context = MakeContext(prNumber: 5, headSha: "sha-1");
         var cached = new PullRequestReport { HeadSha = "sha-1", ReliabilityScore = 88 };
 
-        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(5)).ReturnsAsync(context);
+        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
         _repository.Setup(r => r.GetLatestReviewAsync(Owner, Repo, 5, "sha-1")).ReturnsAsync(cached);
 
-        var result = await _service.ReviewPullRequestAsync(5);
+        var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5);
 
         Assert.Same(cached, result);
         _aiService.Verify(a => a.AnalyzePullRequestAsync(It.IsAny<PullRequestDiffContext>()), Times.Never);
@@ -60,11 +55,11 @@ public class PullRequestReviewServiceTests
         var context = MakeContext(prNumber: 5, headSha: "sha-1");
         var freshReport = new PullRequestReport { HeadSha = "sha-1", ReliabilityScore = 40 };
 
-        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(5)).ReturnsAsync(context);
+        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
         _repository.Setup(r => r.GetLatestReviewAsync(Owner, Repo, 5, "sha-1")).ReturnsAsync((PullRequestReport?)null);
         _aiService.Setup(a => a.AnalyzePullRequestAsync(context)).ReturnsAsync(freshReport);
 
-        var result = await _service.ReviewPullRequestAsync(5);
+        var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5);
 
         Assert.Same(freshReport, result);
         _repository.Verify(r => r.SaveReviewAsync(freshReport), Times.Once);
@@ -76,10 +71,10 @@ public class PullRequestReviewServiceTests
         var context = MakeContext(prNumber: 5, headSha: "sha-1");
         var freshReport = new PullRequestReport { HeadSha = "sha-1", ReliabilityScore = 77 };
 
-        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(5)).ReturnsAsync(context);
+        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
         _aiService.Setup(a => a.AnalyzePullRequestAsync(context)).ReturnsAsync(freshReport);
 
-        var result = await _service.ReviewPullRequestAsync(5, forceRefresh: true);
+        var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5, forceRefresh: true);
 
         Assert.Same(freshReport, result);
         _repository.Verify(r => r.GetLatestReviewAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
@@ -93,24 +88,35 @@ public class PullRequestReviewServiceTests
         // GeminiAIService leaves HeadSha empty on its error-fallback report - simulate that here.
         var failedReport = new PullRequestReport { HeadSha = string.Empty, ReliabilityScore = 0, Verdict = "Analiz Başarısız" };
 
-        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(5)).ReturnsAsync(context);
+        _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
         _repository.Setup(r => r.GetLatestReviewAsync(Owner, Repo, 5, "sha-1")).ReturnsAsync((PullRequestReport?)null);
         _aiService.Setup(a => a.AnalyzePullRequestAsync(context)).ReturnsAsync(failedReport);
 
-        var result = await _service.ReviewPullRequestAsync(5);
+        var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5);
 
         Assert.Same(failedReport, result);
         _repository.Verify(r => r.SaveReviewAsync(It.IsAny<PullRequestReport>()), Times.Never);
     }
 
     [Fact]
-    public async Task GetReviewHistoryAsync_delegates_to_repository_with_configured_owner_and_repo()
+    public async Task GetReviewHistoryAsync_delegates_to_repository()
     {
         var history = new List<PullRequestReport> { new() { PrNumber = 9 } };
         _repository.Setup(r => r.GetReviewHistoryAsync(Owner, Repo, 9)).ReturnsAsync(history);
 
-        var result = await _service.GetReviewHistoryAsync(9);
+        var result = await _service.GetReviewHistoryAsync(Owner, Repo, 9);
 
         Assert.Same(history, result);
+    }
+
+    [Fact]
+    public void GetConfiguredRepositories_delegates_to_github_service()
+    {
+        var repos = new List<RepositoryRef> { new() { Owner = Owner, Repo = Repo } };
+        _gitHubService.Setup(g => g.GetConfiguredRepositories()).Returns(repos);
+
+        var result = _service.GetConfiguredRepositories();
+
+        Assert.Same(repos, result);
     }
 }
