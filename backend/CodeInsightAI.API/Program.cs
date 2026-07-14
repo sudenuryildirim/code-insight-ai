@@ -27,12 +27,16 @@ builder.Services.AddSignalR();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Configure CORS
+// Configure CORS. Falls back to the Angular dev server if Cors:AllowedOrigins isn't set, so local
+// development keeps working unconfigured; production sets it to the deployed frontend's real origin(s).
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:4200" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:4200") // Angular dev server (ng serve)
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials(); // required for the SignalR hub connection (PullRequestHub)
@@ -62,8 +66,6 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
-
-app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<PullRequestHub>("/hubs/pull-requests");

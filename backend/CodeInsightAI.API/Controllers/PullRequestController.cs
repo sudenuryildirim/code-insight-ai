@@ -17,11 +17,19 @@ public class PullRequestController : ControllerBase
         _pdfReportGenerator = pdfReportGenerator;
     }
 
-    // Lists the repos configured under GitHub:Repositories, so the UI can offer a repo switcher.
+    // Lists every repo in the configured GitHub organization, so the UI can offer a repo switcher.
     [HttpGet("repos")]
-    public IActionResult GetConfiguredRepositories()
+    public async Task<IActionResult> GetConfiguredRepositories()
     {
-        return Ok(_pullRequestReviewService.GetConfiguredRepositories());
+        try
+        {
+            var repos = await _pullRequestReviewService.GetConfiguredRepositoriesAsync();
+            return Ok(repos);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Repolar alınırken sunucu hatası oluştu.", error = ex.Message });
+        }
     }
 
     // Lists the currently open pull requests for the given repo.
@@ -70,6 +78,22 @@ public class PullRequestController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = "İnceleme geçmişi alınırken sunucu hatası oluştu.", error = ex.Message });
+        }
+    }
+
+    // Posts a past review as a plain comment on the PR itself, so teammates without this app open
+    // can see the findings. Never approves or merges - that decision stays on GitHub, made by a human.
+    [HttpPost("{owner}/{repo}/{number:int}/comment/{reviewId:guid}")]
+    public async Task<IActionResult> PostReviewComment(string owner, string repo, int number, Guid reviewId)
+    {
+        try
+        {
+            await _pullRequestReviewService.PostReviewCommentAsync(owner, repo, number, reviewId);
+            return Ok(new { posted = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Yorum GitHub'a gönderilirken sunucu hatası oluştu.", error = ex.Message });
         }
     }
 

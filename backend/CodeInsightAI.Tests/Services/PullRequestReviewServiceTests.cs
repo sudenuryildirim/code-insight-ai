@@ -2,6 +2,7 @@ using CodeInsightAI.Application.DTOs;
 using CodeInsightAI.Application.Interfaces;
 using CodeInsightAI.Application.Services;
 using CodeInsightAI.Domain.Entities;
+using CodeInsightAI.Domain.Enums;
 using Moq;
 
 namespace CodeInsightAI.Tests.Services;
@@ -110,13 +111,65 @@ public class PullRequestReviewServiceTests
     }
 
     [Fact]
-    public void GetConfiguredRepositories_delegates_to_github_service()
+    public async Task GetConfiguredRepositoriesAsync_delegates_to_github_service()
     {
         var repos = new List<RepositoryRef> { new() { Owner = Owner, Repo = Repo } };
-        _gitHubService.Setup(g => g.GetConfiguredRepositories()).Returns(repos);
+        _gitHubService.Setup(g => g.GetConfiguredRepositoriesAsync()).ReturnsAsync(repos);
 
-        var result = _service.GetConfiguredRepositories();
+        var result = await _service.GetConfiguredRepositoriesAsync();
 
         Assert.Same(repos, result);
+    }
+
+    [Fact]
+    public async Task PostReviewCommentAsync_posts_formatted_markdown_when_review_matches_pr()
+    {
+        var reviewId = Guid.NewGuid();
+        var report = new PullRequestReport
+        {
+            Id = reviewId,
+            RepoOwner = Owner,
+            RepoName = Repo,
+            PrNumber = 5,
+            ReliabilityScore = 42,
+            Verdict = "Değişiklik Gerekli",
+            DetectedPurpose = "Test amaçlı bir PR.",
+            Issues = new List<ReviewIssue>
+            {
+                new() { Title = "SQL Injection", Severity = IssueSeverity.Critical, Category = IssueCategory.Security, FilePath = "Foo.cs", LineNumber = 10, Description = "...", Suggestion = "Parametreli sorgu kullan." },
+            },
+            Recommendations = new List<string> { "Genel bir öneri." },
+        };
+        _repository.Setup(r => r.GetByIdAsync(reviewId)).ReturnsAsync(report);
+
+        await _service.PostReviewCommentAsync(Owner, Repo, 5, reviewId);
+
+        _gitHubService.Verify(g => g.PostReviewCommentAsync(
+            Owner, Repo, 5,
+            It.Is<string>(body => body.Contains("42/100") && body.Contains("SQL Injection") && body.Contains("Parametreli sorgu kullan."))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task PostReviewCommentAsync_throws_when_review_not_found()
+    {
+        var reviewId = Guid.NewGuid();
+        _repository.Setup(r => r.GetByIdAsync(reviewId)).ReturnsAsync((PullRequestReport?)null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.PostReviewCommentAsync(Owner, Repo, 5, reviewId));
+
+        _gitHubService.Verify(g => g.PostReviewCommentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PostReviewCommentAsync_throws_when_review_belongs_to_a_different_pr()
+    {
+        var reviewId = Guid.NewGuid();
+        var report = new PullRequestReport { Id = reviewId, RepoOwner = Owner, RepoName = Repo, PrNumber = 99 };
+        _repository.Setup(r => r.GetByIdAsync(reviewId)).ReturnsAsync(report);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.PostReviewCommentAsync(Owner, Repo, 5, reviewId));
+
+        _gitHubService.Verify(g => g.PostReviewCommentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
     }
 }

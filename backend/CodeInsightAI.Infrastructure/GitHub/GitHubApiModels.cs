@@ -8,6 +8,15 @@ internal class GitHubUser
     public string Login { get; set; } = string.Empty;
 }
 
+internal class GitHubRepository
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("owner")]
+    public GitHubUser Owner { get; set; } = new();
+}
+
 internal class GitHubBranchRef
 {
     [JsonPropertyName("ref")]

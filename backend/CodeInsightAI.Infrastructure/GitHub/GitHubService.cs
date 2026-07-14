@@ -14,24 +14,43 @@ public class GitHubService : IGitHubService
     private const int MaxFileSizeBytesForFullContent = 50_000;
 
     private readonly HttpClient _httpClient;
-    private readonly List<RepositoryRef> _repositories;
+    private readonly string _organization;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public GitHubService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
 
-        var token = configuration["GitHub:Token"] ?? throw new InvalidOperationException("GitHub token is not configured.");
-        _repositories = configuration.GetSection("GitHub:Repositories").Get<List<RepositoryRef>>() ?? new();
+        var token = configuration["GitHub:Token"];
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new InvalidOperationException("GitHub:Token appsettings içinde yapılandırılmamış.");
+        }
 
-        _httpClient.BaseAddress = new Uri("https://api.github.com/");
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        _organization = configuration["GitHub:Organization"]
+            ?? throw new InvalidOperationException("GitHub:Organization appsettings içinde yapılandırılmamış.");
+
+        // Defaults to public GitHub's API host; set GitHub:ApiBaseUrl (e.g. "https://git.company.com/api/v3/")
+        // to point at a self-hosted GitHub Enterprise Server instance instead.
+        var apiBaseUrl = configuration["GitHub:ApiBaseUrl"];
+        _httpClient.BaseAddress = new Uri(string.IsNullOrWhiteSpace(apiBaseUrl) ? "https://api.github.com/" : apiBaseUrl);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CodeInsightAI");
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         _httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    public List<RepositoryRef> GetConfiguredRepositories() => _repositories;
+    // Auto-discovers every repo in the configured GitHub organization, rather than requiring each
+    // repo to be listed by hand in config - so newly created org repos show up automatically.
+    public async Task<List<RepositoryRef>> GetConfiguredRepositoriesAsync()
+    {
+        var response = await _httpClient.GetAsync($"orgs/{_organization}/repos?per_page=100&sort=updated");
+        response.EnsureSuccessStatusCode();
+
+        var repos = await response.Content.ReadFromJsonAsyncSafe<List<GitHubRepository>>(_jsonOptions) ?? new();
+
+        return repos.Select(r => new RepositoryRef { Owner = r.Owner.Login, Repo = r.Name }).ToList();
+    }
 
     public async Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo)
     {
@@ -96,6 +115,16 @@ public class GitHubService : IGitHubService
             HeadSha = pr.Head.Sha,
             Files = fileChanges
         };
+    }
+
+    public async Task PostReviewCommentAsync(string owner, string repo, int prNumber, string markdownBody)
+    {
+        // GitHub treats PRs as issues for the purposes of plain (non-diff-line) comments.
+        var payload = JsonSerializer.Serialize(new { body = markdownBody });
+        var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync($"repos/{owner}/{repo}/issues/{prNumber}/comments", content);
+        response.EnsureSuccessStatusCode();
     }
 
     private async Task<string> TryGetFileContentAsync(string owner, string repo, string path, string headSha)
