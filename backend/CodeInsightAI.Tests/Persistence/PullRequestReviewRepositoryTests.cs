@@ -39,12 +39,12 @@ public class PullRequestReviewRepositoryTests : IDisposable
     {
         return new PullRequestReport
         {
-            RepoOwner = "sudenuryildirim",
+            RepoOwner = "acme-corp",
             RepoName = "code-insight-ai",
             PrNumber = prNumber,
             PrTitle = "Test PR",
-            PrUrl = "https://github.com/sudenuryildirim/code-insight-ai/pull/" + prNumber,
-            Author = "sudenuryildirim",
+            PrUrl = "https://github.com/acme-corp/sample-project/pull/" + prNumber,
+            Author = "acme-corp",
             BaseBranch = "main",
             HeadBranch = "feature",
             HeadSha = headSha,
@@ -88,7 +88,7 @@ public class PullRequestReviewRepositoryTests : IDisposable
     {
         await _repository.SaveReviewAsync(MakeReport(headSha: "sha-1"));
 
-        var result = await _repository.GetLatestReviewAsync("sudenuryildirim", "code-insight-ai", 7, "sha-1");
+        var result = await _repository.GetLatestReviewAsync("acme-corp", "code-insight-ai", 7, "sha-1");
 
         Assert.NotNull(result);
         Assert.Equal("sha-1", result!.HeadSha);
@@ -99,7 +99,7 @@ public class PullRequestReviewRepositoryTests : IDisposable
     {
         await _repository.SaveReviewAsync(MakeReport(headSha: "sha-1"));
 
-        var result = await _repository.GetLatestReviewAsync("sudenuryildirim", "code-insight-ai", 7, "sha-2");
+        var result = await _repository.GetLatestReviewAsync("acme-corp", "code-insight-ai", 7, "sha-2");
 
         Assert.Null(result);
     }
@@ -124,7 +124,7 @@ public class PullRequestReviewRepositoryTests : IDisposable
             await _repository.SaveReviewAsync(report);
         }
 
-        var history = await _repository.GetReviewHistoryAsync("sudenuryildirim", "code-insight-ai", 7);
+        var history = await _repository.GetReviewHistoryAsync("acme-corp", "code-insight-ai", 7);
 
         Assert.Equal(10, history.Count);
         Assert.Equal("sha-11", history.First().HeadSha); // newest

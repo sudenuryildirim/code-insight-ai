@@ -14,7 +14,7 @@ public class PullRequestReviewServiceTests
     private readonly Mock<IPullRequestReviewRepository> _repository = new();
     private readonly PullRequestReviewService _service;
 
-    private const string Owner = "sudenuryildirim";
+    private const string Owner = "acme-corp";
     private const string Repo = "code-insight-ai";
 
     public PullRequestReviewServiceTests()

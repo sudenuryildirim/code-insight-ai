@@ -36,17 +36,16 @@ PR inceleme özelliğini kullanmak için `appsettings.Development.json` içine k
 
 ```json
 "GitHub": {
-  "Token": "<repo okuma yetkisine sahip bir GitHub Personal Access Token>",
-  "WebhookSecret": "<GitHub webhook ayarlarında girdiğiniz secret ile aynı olmalı>",
-  "Repositories": [
-    { "Owner": "<repo sahibi/organizasyon adı>", "Repo": "<repo adı>" }
-  ]
+  "Token": "<organizasyondaki repolara okuma/yorum yazma yetkisine sahip bir Personal Access Token>",
+  "Organization": "<organizasyon adı, ör. acme-inc>",
+  "ApiBaseUrl": "<opsiyonel - self-hosted GitHub Enterprise Server kullanıyorsanız ör. https://git.sirket.com/api/v3/, boş bırakılırsa public GitHub (api.github.com) kullanılır>",
+  "WebhookSecret": "<GitHub webhook ayarlarında girdiğiniz secret ile aynı olmalı>"
 }
 ```
 
-`Repositories` listesine birden fazla giriş eklenebilir — arayüzde birden fazla repo yapılandırıldığında üstte bir
-repo seçici (chip listesi) belirir. Tüm repolar aynı `Token`'ı kullanır, bu yüzden token'ın erişebildiği repoları
-listeleyin.
+`Organization` altındaki tüm repolar `GET /orgs/{org}/repos` ile otomatik keşfedilir — elle repo listesi girmeye
+gerek yoktur; arayüzde birden fazla repo bulunduğunda üstte bir repo seçici (chip listesi) belirir. Tüm repolar
+aynı `Token`'ı kullanır, bu yüzden token'ın erişebildiği bir hesap/organizasyon token'ı kullanın.
 
 PR listesi ve inceleme her zaman GitHub API'den canlı çekilir; webhook (`POST /api/github/webhook`) bu yüzden
 listenin çalışması için gerekli değildir — sadece isteğe bağlı bir hızlandırma katmanıdır (local geliştirmede
