@@ -13,9 +13,20 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        // Both AI providers are registered so the app never fails to start regardless of which one
+        // AI:Provider selects; only the chosen implementation is actually constructed at request time,
+        // so an unset Gemini:ApiKey is harmless when Ollama is selected (and vice versa).
+        services.AddHttpClient<GeminiAIService>();
         // Local model inference can take much longer than a cloud API call, especially for a 20B
         // model on modest hardware with a large PR diff in context - give it room to finish.
-        services.AddHttpClient<IAIService, OllamaAIService>(client => client.Timeout = TimeSpan.FromMinutes(10));
+        services.AddHttpClient<OllamaAIService>(client => client.Timeout = TimeSpan.FromMinutes(10));
+        services.AddScoped<IAIService>(sp =>
+        {
+            var provider = configuration["AI:Provider"];
+            return string.Equals(provider, "Gemini", StringComparison.OrdinalIgnoreCase)
+                ? sp.GetRequiredService<GeminiAIService>()
+                : sp.GetRequiredService<OllamaAIService>();
+        });
         services.AddHttpClient<IGitHubService, GitHubService>();
         services.AddSingleton<IPdfReportGenerator, QuestPdfReportGenerator>();
 

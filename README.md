@@ -10,8 +10,8 @@ Bu modül **hiçbir zaman otomatik approve/merge yapmaz** — nihai karar her za
 ## Proje yapısı
 
 - `backend/` - ASP.NET Core 9 (Clean Architecture: Domain / Application / Infrastructure / API), GitHub REST API'den
-  PR diff'lerini çeker, yerel bir Ollama sunucusunda çalışan bir modelle analiz eder (kod hiçbir bulut AI servisine
-  gönderilmez), QuestPDF ile PDF rapor üretir. İncelemeler SQLite'a (`codeinsight.db`) kaydedilir; aynı commit için
+  PR diff'lerini çeker, yapılandırılabilir bir AI sağlayıcı (yerel Ollama veya bulut tabanlı Google Gemini) ile
+  analiz eder, QuestPDF ile PDF rapor üretir. İncelemeler SQLite'a (`codeinsight.db`) kaydedilir; aynı commit için
   tekrar inceleme istenirse modele tekrar gitmeden anında sonuç döner. `CodeInsightAI.Tests` (xUnit) birim
   testlerini içerir.
 - `frontend-angular/` - Angular 18 arayüzü (açık PR listesi, inceleme raporu görüntüleme, geçmiş incelemeler,
@@ -31,10 +31,21 @@ dotnet run
 
 API varsayılan olarak `http://localhost:5228` adresinde çalışır.
 
-### AI analiz motoru (Ollama - local)
+### AI analiz motoru (Ollama veya Gemini - parametrik)
 
-PR analizi, bulut bir API yerine yerel bir [Ollama](https://ollama.com) sunucusu üzerinden çalışır; kod hiçbir
-zaman şirket dışına gönderilmez. Kurulum:
+Hangi AI sağlayıcısının kullanılacağı `appsettings.json` / `appsettings.Development.json` içindeki `AI:Provider`
+alanından seçilir:
+
+```json
+"AI": {
+  "Provider": "Ollama"
+}
+```
+
+`"Ollama"` (varsayılan) veya `"Gemini"` değerlerinden biri girilebilir. Her iki sağlayıcının kendi ayarları her
+zaman config'te durabilir - sadece seçilen olan gerçekten kullanılır, diğeri devreye girmez.
+
+**Ollama (yerel, önerilen - kod hiçbir bulut servisine gitmez):**
 
 ```bash
 # Ollama'yı kurun (https://ollama.com/download), ardından modeli indirin:
@@ -42,8 +53,6 @@ ollama pull gpt-oss:20b
 # Ollama servisinin çalıştığından emin olun (genelde kurulumla birlikte otomatik başlar):
 ollama serve
 ```
-
-`appsettings.json` / `appsettings.Development.json` içindeki `Ollama` bölümü:
 
 ```json
 "Ollama": {
@@ -55,6 +64,18 @@ ollama serve
 Ollama farklı bir makinede/portta çalışıyorsa `BaseUrl`'i ona göre güncelleyin. Yerel bir 20B modelle analiz,
 bulut API'lerine göre belirgin şekilde daha yavaş sürebilir (donanıma bağlı olarak birkaç dakika) - backend'in
 Ollama'ya yaptığı istek için zaman aşımı süresi bu yüzden 10 dakikaya ayarlıdır.
+
+**Gemini (bulut tabanlı, Google AI Studio):**
+
+```json
+"Gemini": {
+  "ApiKey": "<Google AI Studio'dan alınan API anahtarı>",
+  "Model": "gemini-2.5-flash"
+}
+```
+
+Bu seçenekte PR diff'leri ve dosya içerikleri Google'ın sunucularına gönderilir - şirket içi/gizli kod için
+Ollama seçeneği tercih edilmelidir.
 
 PR inceleme özelliğini kullanmak için `appsettings.Development.json` içine kendi değerlerinizi girin
 (bu dosya `.gitignore`'da olduğu için commit edilmez):
