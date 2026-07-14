@@ -9,23 +9,27 @@ using Microsoft.Extensions.Configuration;
 
 namespace CodeInsightAI.Infrastructure.AI;
 
-public class GeminiAIService : IAIService
+// Talks to a local Ollama server instead of a cloud AI API, so PR diffs and file contents never
+// leave the company's own infrastructure. Requires the configured model (default gpt-oss:20b) to
+// already be pulled on the machine hosting Ollama: `ollama pull gpt-oss:20b`.
+public class OllamaAIService : IAIService
 {
     private readonly HttpClient _httpClient;
-    private readonly string _apiKey;
     private readonly string _model;
 
-    public GeminiAIService(HttpClient httpClient, IConfiguration configuration)
+    public OllamaAIService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
-        _apiKey = configuration["Gemini:ApiKey"] ?? throw new InvalidOperationException("Gemini API key is not configured.");
-        _model = configuration["Gemini:Model"] ?? "gemini-2.5-flash";
+
+        var baseUrl = configuration["Ollama:BaseUrl"];
+        var normalizedBaseUrl = (string.IsNullOrWhiteSpace(baseUrl) ? "http://localhost:11434" : baseUrl).TrimEnd('/') + "/";
+        _httpClient.BaseAddress = new Uri(normalizedBaseUrl);
+
+        _model = configuration["Ollama:Model"] ?? "gpt-oss:20b";
     }
 
     public async Task<PullRequestReport> AnalyzePullRequestAsync(PullRequestDiffContext context)
     {
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}";
-
         var systemPrompt = @"Sen bir yazılım ekibinde pull request'leri gözden geçiren, kıdemli bir kod reviewer ve güvenlik uzmanısın.
 Görevin, sana verilen pull request'in diff'ini (ve mümkünse ilgili dosyaların PR sonrası tam içeriğini) inceleyip aşağıdaki soruları SON DERECE DETAYLI ve AÇIKLAYICI şekilde yanıtlamaktır:
 
@@ -41,7 +45,7 @@ Kurallar:
 - Her tespit edilen sorun için: sorunun NEDEN bir sorun olduğunu, risklerini ve somut bir ÇÖZÜM ÖNERİSİni detaylı yaz; mümkünse refactoredCode ver.
 - detectedPurpose ve summary alanlarını asla kısa geçme.
 - Yanıt dilin her zaman TÜRKÇE olmalıdır (kod içindeki teknik terimler İngilizce kalabilir).
-- Analiz sonucunu JSON formatında döndür.";
+- Analiz sonucunu, sana verilen JSON şemasına birebir uyan bir JSON nesnesi olarak döndür.";
 
         var filesSection = new StringBuilder();
         foreach (var file in context.Files)
@@ -77,57 +81,52 @@ Değişen dosyalar ({context.Files.Count} adet):
 
         var requestBody = new
         {
-            contents = new[]
+            model = _model,
+            stream = false,
+            messages = new object[]
             {
-                new { parts = new[] { new { text = promptText } } }
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = promptText },
             },
-            systemInstruction = new
+            // Ollama's structured-output support: constrains the model's response to this JSON Schema.
+            format = new
             {
-                parts = new[] { new { text = systemPrompt } }
-            },
-            generationConfig = new
-            {
-                responseMimeType = "application/json",
-                maxOutputTokens = 32768,
-                responseSchema = new
+                type = "object",
+                properties = new
                 {
-                    type = "OBJECT",
-                    properties = new
+                    detectedPurpose = new { type = "string", description = "PR'ın ne yapmaya çalıştığını anlatan, en az 1-2 uzun paragraftan oluşan detaylı Türkçe açıklama" },
+                    reliabilityScore = new { type = "integer", description = "PR'ın genel güvenilirlik skoru (0-100 arası)" },
+                    verdict = new { type = "string", description = "Bulguları özetleyen kısa etiket, örn. 'Onaya Hazır Görünüyor', 'Değişiklik Gerekli'. Bu bir onay/red kararı DEĞİLDİR, sadece özet." },
+                    summary = new { type = "string", description = "PR'ın genel değerlendirmesini, risklerini ve tutarlılığını özetleyen uzun Türkçe değerlendirme" },
+                    issues = new
                     {
-                        detectedPurpose = new { type = "STRING", description = "PR'ın ne yapmaya çalıştığını anlatan, en az 1-2 uzun paragraftan oluşan detaylı Türkçe açıklama" },
-                        reliabilityScore = new { type = "INTEGER", description = "PR'ın genel güvenilirlik skoru (0-100 arası)" },
-                        verdict = new { type = "STRING", description = "Bulguları özetleyen kısa etiket, örn. 'Onaya Hazır Görünüyor', 'Değişiklik Gerekli'. Bu bir onay/red kararı DEĞİLDİR, sadece özet." },
-                        summary = new { type = "STRING", description = "PR'ın genel değerlendirmesini, risklerini ve tutarlılığını özetleyen uzun Türkçe değerlendirme" },
-                        issues = new
+                        type = "array",
+                        items = new
                         {
-                            type = "ARRAY",
-                            items = new
+                            type = "object",
+                            properties = new
                             {
-                                type = "OBJECT",
-                                properties = new
-                                {
-                                    filePath = new { type = "STRING", description = "Sorunun bulunduğu dosya yolu" },
-                                    lineNumber = new { type = "INTEGER", description = "Sorunun başladığı 1-tabanlı satır numarası (bulunamazsa 1 girin)" },
-                                    lineContent = new { type = "STRING", description = "Sorunlu satırın içeriği" },
-                                    severity = new { type = "STRING", @enum = new[] { "Info", "Warning", "Error", "Critical" }, description = "Önem derecesi" },
-                                    category = new { type = "STRING", @enum = new[] { "Bug", "Security", "Performance", "SOLID", "CleanCode", "Refactoring", "CodeSmell", "Testing", "General" }, description = "Hata kategorisi" },
-                                    title = new { type = "STRING", description = "Kısa ve açıklayıcı hata başlığı" },
-                                    description = new { type = "STRING", description = "Sorunun ne olduğu, riskleri ve etkileri" },
-                                    suggestion = new { type = "STRING", description = "Somut çözüm önerisi" },
-                                    refactoredCode = new { type = "STRING", description = "Düzeltilmiş kod bloğu" }
-                                },
-                                required = new[] { "filePath", "lineNumber", "severity", "category", "title", "description", "suggestion" }
-                            }
-                        },
-                        recommendations = new
-                        {
-                            type = "ARRAY",
-                            description = "Tekil sorunların ötesinde genel iyileştirme önerileri",
-                            items = new { type = "STRING" }
+                                filePath = new { type = "string", description = "Sorunun bulunduğu dosya yolu" },
+                                lineNumber = new { type = "integer", description = "Sorunun başladığı 1-tabanlı satır numarası (bulunamazsa 1 girin)" },
+                                lineContent = new { type = "string", description = "Sorunlu satırın içeriği" },
+                                severity = new { type = "string", @enum = new[] { "Info", "Warning", "Error", "Critical" }, description = "Önem derecesi" },
+                                category = new { type = "string", @enum = new[] { "Bug", "Security", "Performance", "SOLID", "CleanCode", "Refactoring", "CodeSmell", "Testing", "General" }, description = "Hata kategorisi" },
+                                title = new { type = "string", description = "Kısa ve açıklayıcı hata başlığı" },
+                                description = new { type = "string", description = "Sorunun ne olduğu, riskleri ve etkileri" },
+                                suggestion = new { type = "string", description = "Somut çözüm önerisi" },
+                                refactoredCode = new { type = "string", description = "Düzeltilmiş kod bloğu" }
+                            },
+                            required = new[] { "filePath", "lineNumber", "severity", "category", "title", "description", "suggestion" }
                         }
                     },
-                    required = new[] { "detectedPurpose", "reliabilityScore", "verdict", "summary", "issues", "recommendations" }
-                }
+                    recommendations = new
+                    {
+                        type = "array",
+                        description = "Tekil sorunların ötesinde genel iyileştirme önerileri",
+                        items = new { type = "string" }
+                    }
+                },
+                required = new[] { "detectedPurpose", "reliabilityScore", "verdict", "summary", "issues", "recommendations" }
             }
         };
 
@@ -136,7 +135,7 @@ Değişen dosyalar ({context.Files.Count} adet):
 
         try
         {
-            var text = await CallGeminiAsync(url, httpContent);
+            var text = await CallOllamaAsync(httpContent);
 
             var report = JsonSerializer.Deserialize<PullRequestReport>(text, DeserializeOptions);
 
@@ -182,8 +181,8 @@ Değişen dosyalar ({context.Files.Count} adet):
                         Severity = IssueSeverity.Critical,
                         Category = IssueCategory.General,
                         Title = "PR Analiz Hatası",
-                        Description = $"Gemini servisine bağlanırken veya yanıtı ayrıştırırken hata oluştu. Hata detayı: {ex.Message}",
-                        Suggestion = "API anahtarını, GitHub token'ını ve internet bağlantısını kontrol ediniz."
+                        Description = $"Ollama servisine bağlanırken veya yanıtı ayrıştırırken hata oluştu. Hata detayı: {ex.Message}",
+                        Suggestion = "Ollama'nın çalıştığını (ollama serve), yapılandırılan modelin pull edildiğini (ollama pull gpt-oss:20b) ve Ollama:BaseUrl ayarını kontrol ediniz."
                     }
                 }
             };
@@ -209,24 +208,22 @@ Değişen dosyalar ({context.Files.Count} adet):
         return value[..maxLength] + "\n... (uzunluk sınırı nedeniyle kesildi)";
     }
 
-    private async Task<string> CallGeminiAsync(string url, HttpContent httpContent)
+    private async Task<string> CallOllamaAsync(HttpContent httpContent)
     {
-        var response = await _httpClient.PostAsync(url, httpContent);
+        var response = await _httpClient.PostAsync("api/chat", httpContent);
         response.EnsureSuccessStatusCode();
 
         var responseString = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(responseString);
 
         var text = document.RootElement
-            .GetProperty("candidates")[0]
+            .GetProperty("message")
             .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
             .GetString();
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new InvalidOperationException("API returns empty review result.");
+            throw new InvalidOperationException("Ollama returned an empty review result.");
         }
 
         return text;

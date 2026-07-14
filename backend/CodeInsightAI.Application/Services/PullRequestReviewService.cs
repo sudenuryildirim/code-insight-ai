@@ -47,8 +47,8 @@ public class PullRequestReviewService : IPullRequestReviewService
 
         var report = await _aiService.AnalyzePullRequestAsync(context);
 
-        // A failed analysis leaves HeadSha empty (see GeminiAIService) - never cache those,
-        // otherwise a transient Gemini failure would get served forever for this commit.
+        // A failed analysis leaves HeadSha empty (see OllamaAIService) - never cache those,
+        // otherwise a transient AI failure would get served forever for this commit.
         if (!string.IsNullOrEmpty(report.HeadSha))
         {
             await _repository.SaveReviewAsync(report);

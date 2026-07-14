@@ -9,7 +9,7 @@ namespace CodeInsightAI.Infrastructure.GitHub;
 public class GitHubService : IGitHubService
 {
     // Full file content is only fetched (for project-wide consistency checks) when the
-    // PR touches a manageable number of files, to keep the Gemini prompt/token usage bounded.
+    // PR touches a manageable number of files, to keep the AI prompt/token usage bounded.
     private const int MaxFilesForFullContent = 15;
     private const int MaxFileSizeBytesForFullContent = 50_000;
 

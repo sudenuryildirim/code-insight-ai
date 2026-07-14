@@ -10,9 +10,10 @@ Bu modül **hiçbir zaman otomatik approve/merge yapmaz** — nihai karar her za
 ## Proje yapısı
 
 - `backend/` - ASP.NET Core 9 (Clean Architecture: Domain / Application / Infrastructure / API), GitHub REST API'den
-  PR diff'lerini çeker, Google Gemini ile analiz eder, QuestPDF ile PDF rapor üretir. İncelemeler SQLite'a
-  (`codeinsight.db`) kaydedilir; aynı commit için tekrar inceleme istenirse Gemini'ye gitmeden anında sonuç döner.
-  `CodeInsightAI.Tests` (xUnit) birim testlerini içerir.
+  PR diff'lerini çeker, yerel bir Ollama sunucusunda çalışan bir modelle analiz eder (kod hiçbir bulut AI servisine
+  gönderilmez), QuestPDF ile PDF rapor üretir. İncelemeler SQLite'a (`codeinsight.db`) kaydedilir; aynı commit için
+  tekrar inceleme istenirse modele tekrar gitmeden anında sonuç döner. `CodeInsightAI.Tests` (xUnit) birim
+  testlerini içerir.
 - `frontend-angular/` - Angular 18 arayüzü (açık PR listesi, inceleme raporu görüntüleme, geçmiş incelemeler,
   PDF indirme). SignalR üzerinden backend'e bağlanır; GitHub webhook'u bir PR'ı güncellediğinde liste otomatik
   yenilenir (bkz. "Gerçek zamanlı bildirim" altında).
@@ -28,8 +29,32 @@ dotnet restore
 dotnet run
 ```
 
-API varsayılan olarak `http://localhost:5228` adresinde çalışır. Gemini API anahtarı `appsettings.json` /
-`appsettings.Development.json` içindeki `Gemini:ApiKey` alanından okunur.
+API varsayılan olarak `http://localhost:5228` adresinde çalışır.
+
+### AI analiz motoru (Ollama - local)
+
+PR analizi, bulut bir API yerine yerel bir [Ollama](https://ollama.com) sunucusu üzerinden çalışır; kod hiçbir
+zaman şirket dışına gönderilmez. Kurulum:
+
+```bash
+# Ollama'yı kurun (https://ollama.com/download), ardından modeli indirin:
+ollama pull gpt-oss:20b
+# Ollama servisinin çalıştığından emin olun (genelde kurulumla birlikte otomatik başlar):
+ollama serve
+```
+
+`appsettings.json` / `appsettings.Development.json` içindeki `Ollama` bölümü:
+
+```json
+"Ollama": {
+  "BaseUrl": "http://localhost:11434",
+  "Model": "gpt-oss:20b"
+}
+```
+
+Ollama farklı bir makinede/portta çalışıyorsa `BaseUrl`'i ona göre güncelleyin. Yerel bir 20B modelle analiz,
+bulut API'lerine göre belirgin şekilde daha yavaş sürebilir (donanıma bağlı olarak birkaç dakika) - backend'in
+Ollama'ya yaptığı istek için zaman aşımı süresi bu yüzden 10 dakikaya ayarlıdır.
 
 PR inceleme özelliğini kullanmak için `appsettings.Development.json` içine kendi değerlerinizi girin
 (bu dosya `.gitignore`'da olduğu için commit edilmez):
