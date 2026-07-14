@@ -86,7 +86,7 @@ public class PullRequestReviewServiceTests
     public async Task ReviewPullRequestAsync_does_not_cache_a_failed_analysis()
     {
         var context = MakeContext(prNumber: 5, headSha: "sha-1");
-        // GeminiAIService leaves HeadSha empty on its error-fallback report - simulate that here.
+        // OllamaAIService leaves HeadSha empty on its error-fallback report - simulate that here.
         var failedReport = new PullRequestReport { HeadSha = string.Empty, ReliabilityScore = 0, Verdict = "Analiz Başarısız" };
 
         _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
