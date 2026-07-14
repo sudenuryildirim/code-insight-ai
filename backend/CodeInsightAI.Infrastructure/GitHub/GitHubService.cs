@@ -14,28 +14,47 @@ public class GitHubService : IGitHubService
     private const int MaxFileSizeBytesForFullContent = 50_000;
 
     private readonly HttpClient _httpClient;
-    private readonly string _owner;
-    private readonly string _repo;
+    private readonly string _organization;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public GitHubService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
 
-        var token = configuration["GitHub:Token"] ?? throw new InvalidOperationException("GitHub token is not configured.");
-        _owner = configuration["GitHub:Owner"] ?? throw new InvalidOperationException("GitHub repo owner is not configured.");
-        _repo = configuration["GitHub:Repo"] ?? throw new InvalidOperationException("GitHub repo name is not configured.");
+        var token = configuration["GitHub:Token"];
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new InvalidOperationException("GitHub:Token appsettings içinde yapılandırılmamış.");
+        }
 
-        _httpClient.BaseAddress = new Uri("https://api.github.com/");
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        _organization = configuration["GitHub:Organization"]
+            ?? throw new InvalidOperationException("GitHub:Organization appsettings içinde yapılandırılmamış.");
+
+        // Defaults to public GitHub's API host; set GitHub:ApiBaseUrl (e.g. "https://git.company.com/api/v3/")
+        // to point at a self-hosted GitHub Enterprise Server instance instead.
+        var apiBaseUrl = configuration["GitHub:ApiBaseUrl"];
+        _httpClient.BaseAddress = new Uri(string.IsNullOrWhiteSpace(apiBaseUrl) ? "https://api.github.com/" : apiBaseUrl);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CodeInsightAI");
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         _httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    public async Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync()
+    // Auto-discovers every repo in the configured GitHub organization, rather than requiring each
+    // repo to be listed by hand in config - so newly created org repos show up automatically.
+    public async Task<List<RepositoryRef>> GetConfiguredRepositoriesAsync()
     {
-        var response = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/pulls?state=open&sort=updated&direction=desc");
+        var response = await _httpClient.GetAsync($"orgs/{_organization}/repos?per_page=100&sort=updated");
+        response.EnsureSuccessStatusCode();
+
+        var repos = await response.Content.ReadFromJsonAsyncSafe<List<GitHubRepository>>(_jsonOptions) ?? new();
+
+        return repos.Select(r => new RepositoryRef { Owner = r.Owner.Login, Repo = r.Name }).ToList();
+    }
+
+    public async Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo)
+    {
+        var response = await _httpClient.GetAsync($"repos/{owner}/{repo}/pulls?state=open&sort=updated&direction=desc");
         response.EnsureSuccessStatusCode();
 
         var pulls = await response.Content.ReadFromJsonAsyncSafe<List<GitHubPullRequest>>(_jsonOptions) ?? new();
@@ -52,14 +71,14 @@ public class GitHubService : IGitHubService
         }).ToList();
     }
 
-    public async Task<PullRequestDiffContext> GetPullRequestDiffAsync(int prNumber)
+    public async Task<PullRequestDiffContext> GetPullRequestDiffAsync(string owner, string repo, int prNumber)
     {
-        var prResponse = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/pulls/{prNumber}");
+        var prResponse = await _httpClient.GetAsync($"repos/{owner}/{repo}/pulls/{prNumber}");
         prResponse.EnsureSuccessStatusCode();
         var pr = await prResponse.Content.ReadFromJsonAsyncSafe<GitHubPullRequest>(_jsonOptions)
             ?? throw new InvalidOperationException($"PR #{prNumber} bulunamadı.");
 
-        var filesResponse = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/pulls/{prNumber}/files?per_page=100");
+        var filesResponse = await _httpClient.GetAsync($"repos/{owner}/{repo}/pulls/{prNumber}/files?per_page=100");
         filesResponse.EnsureSuccessStatusCode();
         var files = await filesResponse.Content.ReadFromJsonAsyncSafe<List<GitHubPullRequestFile>>(_jsonOptions) ?? new();
 
@@ -76,7 +95,7 @@ public class GitHubService : IGitHubService
 
             if (fetchFullContent && file.Status != "removed")
             {
-                change.FullContent = await TryGetFileContentAsync(file.FileName, pr.Head.Sha);
+                change.FullContent = await TryGetFileContentAsync(owner, repo, file.FileName, pr.Head.Sha);
             }
 
             fileChanges.Add(change);
@@ -84,8 +103,8 @@ public class GitHubService : IGitHubService
 
         return new PullRequestDiffContext
         {
-            RepoOwner = _owner,
-            RepoName = _repo,
+            RepoOwner = owner,
+            RepoName = repo,
             PrNumber = pr.Number,
             PrTitle = pr.Title,
             PrDescription = pr.Body ?? string.Empty,
@@ -98,11 +117,21 @@ public class GitHubService : IGitHubService
         };
     }
 
-    private async Task<string> TryGetFileContentAsync(string path, string headSha)
+    public async Task PostReviewCommentAsync(string owner, string repo, int prNumber, string markdownBody)
+    {
+        // GitHub treats PRs as issues for the purposes of plain (non-diff-line) comments.
+        var payload = JsonSerializer.Serialize(new { body = markdownBody });
+        var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync($"repos/{owner}/{repo}/issues/{prNumber}/comments", content);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private async Task<string> TryGetFileContentAsync(string owner, string repo, string path, string headSha)
     {
         try
         {
-            var response = await _httpClient.GetAsync($"repos/{_owner}/{_repo}/contents/{Uri.EscapeDataString(path)}?ref={headSha}");
+            var response = await _httpClient.GetAsync($"repos/{owner}/{repo}/contents/{Uri.EscapeDataString(path)}?ref={headSha}");
             if (!response.IsSuccessStatusCode)
             {
                 return string.Empty;

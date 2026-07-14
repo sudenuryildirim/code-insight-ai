@@ -1,8 +1,8 @@
 <ng-container *ngIf="!selectedReport; else reportBlock">
-  <section class="panel pr-panel">
-    <div class="panel-header">
-      <div class="panel-title-row">
-        <h3>Açık Pull Request'ler</h3>
+  <section class="pr-section">
+    <div class="section-header">
+      <div class="section-title-row">
+        <h2>Açık Pull Request'ler</h2>
         <span class="live-indicator" [class.live-indicator-on]="isLive">
           <span class="live-dot"></span>
           {{ isLive ? 'Canlı' : 'Bağlanıyor…' }}
@@ -13,20 +13,33 @@
       </button>
     </div>
 
+    <div class="repo-chips" *ngIf="repositories.length > 1">
+      <button
+        type="button"
+        class="repo-chip"
+        *ngFor="let repository of repositories"
+        [class.active]="repository === selectedRepo"
+        (click)="selectRepo(repository)"
+      >
+        {{ repository.owner }}/{{ repository.repo }}
+      </button>
+    </div>
+
     <p class="hint">
-      Listelenen PR'lar, backend'de yapılandırılmış GitHub reposundan canlı çekilir. "İncele" butonu, PR'ın amacını,
-      olası hata/güvenlik sorunlarını ve mevcut kodla tutarlılığını raporlar — onay veya merge işlemini bu sistem
-      yapmaz, karar her zaman sizindir.
+      Listelenen PR'lar, backend'de yapılandırılmış GitHub organizasyonundan canlı çekilir. "İncele" butonu, PR'ın
+      amacını, olası hata/güvenlik sorunlarını ve mevcut kodla tutarlılığını raporlar — onay veya merge işlemini bu
+      sistem yapmaz, karar her zaman sizindir.
     </p>
 
+    <p class="error-box" *ngIf="reposError">{{ reposError }}</p>
     <p class="error-box" *ngIf="listError">{{ listError }}</p>
     <p class="error-box" *ngIf="reviewError">{{ reviewError }}</p>
 
     <div class="pr-list" *ngIf="pullRequests.length > 0; else emptyState">
-      <div class="pr-item" *ngFor="let pr of pullRequests">
-        <div class="pr-item-main">
-          <div class="pr-number-badge">#{{ pr.number }}</div>
-          <div class="pr-item-body">
+      <div class="pr-row" *ngFor="let pr of pullRequests">
+        <div class="pr-row-main">
+          <span class="pr-number">#{{ pr.number }}</span>
+          <div class="pr-row-body">
             <span class="pr-title">{{ pr.title }}</span>
             <span class="pr-meta">
               <span class="pr-author">{{ pr.author }}</span>
@@ -34,7 +47,7 @@
             </span>
           </div>
         </div>
-        <div class="pr-item-side">
+        <div class="pr-row-side">
           <span class="pr-updated">{{ pr.updatedAt | date: 'd MMM, HH:mm' }}</span>
           <button
             type="button"
@@ -69,10 +82,22 @@
         <span class="history-date">{{ entry.createdAt | date: 'd MMM, HH:mm' }}</span>
       </button>
     </div>
-    <button type="button" class="btn btn-ghost reanalyze-btn" [disabled]="isReanalyzing" (click)="reanalyze()">
-      {{ isReanalyzing ? 'Yeniden Analiz Ediliyor…' : 'Yeniden Analiz Et' }}
-    </button>
+    <div class="review-history-actions">
+      <button type="button" class="btn btn-ghost reanalyze-btn" [disabled]="isReanalyzing" (click)="reanalyze()">
+        {{ isReanalyzing ? 'Yeniden Analiz Ediliyor…' : 'Yeniden Analiz Et' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost comment-btn"
+        [disabled]="isPostingComment || commentPosted"
+        (click)="postComment()"
+      >
+        {{ isPostingComment ? 'Gönderiliyor…' : commentPosted ? 'GitHub\'a Gönderildi' : 'GitHub\'a Yorum Olarak Gönder' }}
+      </button>
+    </div>
   </div>
+
+  <p class="error-box comment-error" *ngIf="commentError">{{ commentError }}</p>
 
   <app-report-view [report]="adaptedReport!" (reset)="backToList()"></app-report-view>
 </ng-template>

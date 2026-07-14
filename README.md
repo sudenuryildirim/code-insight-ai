@@ -1,8 +1,9 @@
 # CodeInsightAI
 
-Yapay zeka destekli GitHub pull request inceleme aracı. Bağlı bir GitHub reposundaki açık pull request'leri listeler;
-her biri için PR'ın amacını, olası bug/mantık hatalarını, güvenlik açıklarını (OWASP Top 10) ve projenin geri kalanıyla
-tutarlılığını değerlendiren detaylı bir rapor üretir, indirilebilir bir PDF olarak sunar.
+Yapay zeka destekli GitHub pull request inceleme aracı. Yapılandırılan bir veya birden fazla GitHub reposundaki açık
+pull request'leri listeler (repo seçici ile aralarında geçiş yapılır); her biri için PR'ın amacını, olası bug/mantık
+hatalarını, güvenlik açıklarını (OWASP Top 10) ve projenin geri kalanıyla tutarlılığını değerlendiren detaylı bir
+rapor üretir, indirilebilir bir PDF olarak sunar.
 
 Bu modül **hiçbir zaman otomatik approve/merge yapmaz** — nihai karar her zaman GitHub üzerinde insan tarafından verilir.
 
@@ -36,11 +37,16 @@ PR inceleme özelliğini kullanmak için `appsettings.Development.json` içine k
 ```json
 "GitHub": {
   "Token": "<repo okuma yetkisine sahip bir GitHub Personal Access Token>",
-  "Owner": "<repo sahibi/organizasyon adı>",
-  "Repo": "<repo adı>",
-  "WebhookSecret": "<GitHub webhook ayarlarında girdiğiniz secret ile aynı olmalı>"
+  "WebhookSecret": "<GitHub webhook ayarlarında girdiğiniz secret ile aynı olmalı>",
+  "Repositories": [
+    { "Owner": "<repo sahibi/organizasyon adı>", "Repo": "<repo adı>" }
+  ]
 }
 ```
+
+`Repositories` listesine birden fazla giriş eklenebilir — arayüzde birden fazla repo yapılandırıldığında üstte bir
+repo seçici (chip listesi) belirir. Tüm repolar aynı `Token`'ı kullanır, bu yüzden token'ın erişebildiği repoları
+listeleyin.
 
 PR listesi ve inceleme her zaman GitHub API'den canlı çekilir; webhook (`POST /api/github/webhook`) bu yüzden
 listenin çalışması için gerekli değildir — sadece isteğe bağlı bir hızlandırma katmanıdır (local geliştirmede

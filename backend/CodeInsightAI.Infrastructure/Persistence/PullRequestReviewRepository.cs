@@ -22,6 +22,13 @@ public class PullRequestReviewRepository : IPullRequestReviewRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<PullRequestReport?> GetByIdAsync(Guid id)
+    {
+        return await _dbContext.PullRequestReports
+            .Include(r => r.Issues)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
+
     public async Task<List<PullRequestReport>> GetReviewHistoryAsync(string owner, string repo, int prNumber)
     {
         return await _dbContext.PullRequestReports

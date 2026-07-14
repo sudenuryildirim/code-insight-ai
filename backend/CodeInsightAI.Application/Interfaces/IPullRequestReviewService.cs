@@ -5,9 +5,15 @@ namespace CodeInsightAI.Application.Interfaces;
 
 public interface IPullRequestReviewService
 {
-    Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync();
+    Task<List<RepositoryRef>> GetConfiguredRepositoriesAsync();
 
-    Task<PullRequestReport> ReviewPullRequestAsync(int prNumber, bool forceRefresh = false);
+    Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo);
 
-    Task<List<PullRequestReport>> GetReviewHistoryAsync(int prNumber);
+    Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false);
+
+    Task<List<PullRequestReport>> GetReviewHistoryAsync(string owner, string repo, int prNumber);
+
+    // Posts the given past review as a plain comment on the PR itself. Never approves or merges -
+    // it only makes the report visible to people who don't have this app open.
+    Task PostReviewCommentAsync(string owner, string repo, int prNumber, Guid reviewId);
 }

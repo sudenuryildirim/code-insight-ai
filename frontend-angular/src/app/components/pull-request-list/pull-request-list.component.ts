@@ -4,7 +4,7 @@ import { Subscription } from 'rxjs';
 import { PullRequestService } from '../../services/pull-request.service';
 import { PullRequestLiveService } from '../../services/pull-request-live.service';
 import { ReportViewComponent } from '../report-view/report-view.component';
-import { CodeReviewReport, PullRequestReport, PullRequestSummary } from '../../models/report.model';
+import { CodeReviewReport, PullRequestReport, PullRequestSummary, RepositoryRef } from '../../models/report.model';
 
 @Component({
   selector: 'app-pull-request-list',
@@ -14,6 +14,10 @@ import { CodeReviewReport, PullRequestReport, PullRequestSummary } from '../../m
   styleUrl: './pull-request-list.component.css',
 })
 export class PullRequestListComponent implements OnInit, OnDestroy {
+  repositories: RepositoryRef[] = [];
+  selectedRepo: RepositoryRef | null = null;
+  reposError: string | null = null;
+
   pullRequests: PullRequestSummary[] = [];
   isLoadingList = false;
   listError: string | null = null;
@@ -24,6 +28,10 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
   reviewHistory: PullRequestReport[] = [];
   isReanalyzing = false;
 
+  isPostingComment = false;
+  commentPosted = false;
+  commentError: string | null = null;
+
   isLive = false;
   private readonly liveSubscriptions = new Subscription();
 
@@ -33,14 +41,18 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.loadPullRequests();
+    this.loadRepositories();
 
     this.liveService.connect();
     this.liveSubscriptions.add(this.liveService.connected.subscribe((connected) => (this.isLive = connected)));
     this.liveSubscriptions.add(
-      this.liveService.pullRequestChanged.subscribe(() => {
-        // Only auto-refresh the list view - don't yank the user out of a report they're reading.
-        if (!this.selectedReport) {
+      this.liveService.pullRequestChanged.subscribe((event) => {
+        const matchesSelectedRepo =
+          !this.selectedRepo || (event.owner === this.selectedRepo.owner && event.repo === this.selectedRepo.repo);
+
+        // Only auto-refresh the list view - don't yank the user out of a report they're reading,
+        // and ignore changes for repos other than the one currently selected.
+        if (!this.selectedReport && matchesSelectedRepo) {
           this.loadPullRequests();
         }
       }),
@@ -51,11 +63,40 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
     this.liveSubscriptions.unsubscribe();
   }
 
+  loadRepositories(): void {
+    this.reposError = null;
+
+    this.pullRequestService.getRepositories().subscribe({
+      next: (repositories) => {
+        this.repositories = repositories;
+        if (repositories.length > 0) {
+          this.selectRepo(repositories[0]);
+        } else {
+          this.reposError = 'Yapılandırılmış organizasyonda repo bulunamadı. appsettings.Development.json içindeki GitHub:Organization değerini kontrol edin.';
+        }
+      },
+      error: (err) => {
+        this.reposError = err?.error?.message ?? 'Repo listesi alınamadı. Backend servisini kontrol edin.';
+      },
+    });
+  }
+
+  selectRepo(repo: RepositoryRef): void {
+    this.selectedRepo = repo;
+    this.backToList();
+    this.loadPullRequests();
+  }
+
   loadPullRequests(): void {
+    if (!this.selectedRepo) {
+      return;
+    }
+    const { owner, repo } = this.selectedRepo;
+
     this.isLoadingList = true;
     this.listError = null;
 
-    this.pullRequestService.getOpenPullRequests().subscribe({
+    this.pullRequestService.getOpenPullRequests(owner, repo).subscribe({
       next: (pullRequests) => {
         this.pullRequests = pullRequests;
         this.isLoadingList = false;
@@ -69,6 +110,11 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
   }
 
   reviewPullRequest(number: number, force = false): void {
+    if (!this.selectedRepo) {
+      return;
+    }
+    const { owner, repo } = this.selectedRepo;
+
     if (force) {
       this.isReanalyzing = true;
     } else {
@@ -76,11 +122,13 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
     }
     this.reviewError = null;
 
-    this.pullRequestService.reviewPullRequest(number, force).subscribe({
+    this.pullRequestService.reviewPullRequest(owner, repo, number, force).subscribe({
       next: (report) => {
         this.selectedReport = report;
         this.reviewingNumber = null;
         this.isReanalyzing = false;
+        this.commentPosted = false;
+        this.commentError = null;
         this.loadHistory(number);
       },
       error: (err) => {
@@ -98,7 +146,12 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
   }
 
   loadHistory(number: number): void {
-    this.pullRequestService.getReviewHistory(number).subscribe({
+    if (!this.selectedRepo) {
+      return;
+    }
+    const { owner, repo } = this.selectedRepo;
+
+    this.pullRequestService.getReviewHistory(owner, repo, number).subscribe({
       next: (history) => (this.reviewHistory = history),
       error: () => (this.reviewHistory = []),
     });
@@ -106,6 +159,29 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
 
   selectHistoryEntry(entry: PullRequestReport): void {
     this.selectedReport = entry;
+    this.commentPosted = false;
+    this.commentError = null;
+  }
+
+  postComment(): void {
+    if (!this.selectedRepo || !this.selectedReport) {
+      return;
+    }
+    const { owner, repo } = this.selectedRepo;
+
+    this.isPostingComment = true;
+    this.commentError = null;
+
+    this.pullRequestService.postReviewComment(owner, repo, this.selectedReport.prNumber, this.selectedReport.id).subscribe({
+      next: () => {
+        this.isPostingComment = false;
+        this.commentPosted = true;
+      },
+      error: (err) => {
+        this.commentError = err?.error?.message ?? 'Yorum GitHub\'a gönderilirken bir hata oluştu.';
+        this.isPostingComment = false;
+      },
+    });
   }
 
   backToList(): void {

@@ -59,10 +59,21 @@ public class GitHubWebhookController : ControllerBase
         var action = payload.RootElement.TryGetProperty("action", out var actionProp) ? actionProp.GetString() : null;
         var prNumber = payload.RootElement.TryGetProperty("number", out var numberProp) ? numberProp.GetInt32() : (int?)null;
 
+        string? owner = null;
+        string? repo = null;
+        if (payload.RootElement.TryGetProperty("repository", out var repoProp))
+        {
+            repo = repoProp.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
+            if (repoProp.TryGetProperty("owner", out var ownerProp) && ownerProp.TryGetProperty("login", out var loginProp))
+            {
+                owner = loginProp.GetString();
+            }
+        }
+
         if (action != null && RelevantActions.Contains(action))
         {
-            _logger.LogInformation("GitHub webhook: PR #{PrNumber} {Action}", prNumber, action);
-            await _hubContext.Clients.All.SendAsync("pullRequestChanged", new { prNumber, action });
+            _logger.LogInformation("GitHub webhook: {Owner}/{Repo} PR #{PrNumber} {Action}", owner, repo, prNumber, action);
+            await _hubContext.Clients.All.SendAsync("pullRequestChanged", new { owner, repo, prNumber, action });
         }
 
         return Ok(new { received = true });

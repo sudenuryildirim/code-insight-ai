@@ -1,15 +1,26 @@
-<div class="page">
+<div class="shell">
   <header class="page-header">
-    <div class="brand">
-      <div class="logo">CI</div>
-      <div>
-        <h1>CodeInsightAI</h1>
-        <span>GitHub Pull Request İnceleme Aracı</span>
+    <div class="page-header-inner">
+      <div class="brand">
+        <div class="mark">C</div>
+        <div class="brand-text">
+          <h1>CodeInsightAI<span class="accent-bar"></span></h1>
+          <span>GitHub Pull Request İnceleme Aracı</span>
+        </div>
       </div>
     </div>
   </header>
 
   <main class="page-content">
-    <app-pull-request-list></app-pull-request-list>
+    <div class="page-content-inner">
+      <app-pull-request-list></app-pull-request-list>
+    </div>
   </main>
+
+  <footer class="page-footer">
+    <div class="page-footer-inner">
+      <span>CodeInsightAI</span>
+      <span class="footer-note">Onay ve merge kararı her zaman insana aittir — bu sistem yalnızca raporlar.</span>
+    </div>
+  </footer>
 </div>
