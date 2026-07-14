@@ -28,6 +28,10 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
   reviewHistory: PullRequestReport[] = [];
   isReanalyzing = false;
 
+  isPostingComment = false;
+  commentPosted = false;
+  commentError: string | null = null;
+
   isLive = false;
   private readonly liveSubscriptions = new Subscription();
 
@@ -68,7 +72,7 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
         if (repositories.length > 0) {
           this.selectRepo(repositories[0]);
         } else {
-          this.reposError = 'Yapılandırılmış bir GitHub reposu bulunamadı. appsettings.Development.json içindeki GitHub:Repositories listesini doldurun.';
+          this.reposError = 'Yapılandırılmış organizasyonda repo bulunamadı. appsettings.Development.json içindeki GitHub:Organization değerini kontrol edin.';
         }
       },
       error: (err) => {
@@ -123,6 +127,8 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
         this.selectedReport = report;
         this.reviewingNumber = null;
         this.isReanalyzing = false;
+        this.commentPosted = false;
+        this.commentError = null;
         this.loadHistory(number);
       },
       error: (err) => {
@@ -153,6 +159,29 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
 
   selectHistoryEntry(entry: PullRequestReport): void {
     this.selectedReport = entry;
+    this.commentPosted = false;
+    this.commentError = null;
+  }
+
+  postComment(): void {
+    if (!this.selectedRepo || !this.selectedReport) {
+      return;
+    }
+    const { owner, repo } = this.selectedRepo;
+
+    this.isPostingComment = true;
+    this.commentError = null;
+
+    this.pullRequestService.postReviewComment(owner, repo, this.selectedReport.prNumber, this.selectedReport.id).subscribe({
+      next: () => {
+        this.isPostingComment = false;
+        this.commentPosted = true;
+      },
+      error: (err) => {
+        this.commentError = err?.error?.message ?? 'Yorum GitHub\'a gönderilirken bir hata oluştu.';
+        this.isPostingComment = false;
+      },
+    });
   }
 
   backToList(): void {

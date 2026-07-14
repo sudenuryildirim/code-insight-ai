@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import * as signalR from '@microsoft/signalr';
 import { Subject } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface PullRequestChangedEvent {
   owner: string | null;
@@ -14,7 +15,7 @@ export interface PullRequestChangedEvent {
 // so the UI can refresh the list on its own instead of requiring a manual "Yenile" click.
 @Injectable({ providedIn: 'root' })
 export class PullRequestLiveService implements OnDestroy {
-  private readonly hubUrl = 'http://localhost:5228/hubs/pull-requests';
+  private readonly hubUrl = `${environment.apiBaseUrl}/hubs/pull-requests`;
   private connection: signalR.HubConnection | null = null;
 
   readonly pullRequestChanged = new Subject<PullRequestChangedEvent>();

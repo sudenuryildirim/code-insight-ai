@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { CodeReviewReport, PullRequestReport, PullRequestSummary, RepositoryRef } from '../models/report.model';
 
 @Injectable({ providedIn: 'root' })
 export class PullRequestService {
-  // Matches the ASP.NET Core "http" launch profile (see backend/CodeInsightAI.API/Properties/launchSettings.json).
-  private readonly baseUrl = 'http://localhost:5228/api/pullrequest';
+  private readonly baseUrl = `${environment.apiBaseUrl}/api/pullrequest`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -25,6 +25,10 @@ export class PullRequestService {
 
   getReviewHistory(owner: string, repo: string, number: number): Observable<PullRequestReport[]> {
     return this.http.get<PullRequestReport[]>(`${this.baseUrl}/${owner}/${repo}/${number}/history`);
+  }
+
+  postReviewComment(owner: string, repo: string, number: number, reviewId: string): Observable<{ posted: boolean }> {
+    return this.http.post<{ posted: boolean }>(`${this.baseUrl}/${owner}/${repo}/${number}/comment/${reviewId}`, {});
   }
 
   downloadPdf(report: CodeReviewReport): Observable<Blob> {
