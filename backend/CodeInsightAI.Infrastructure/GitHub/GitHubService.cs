@@ -30,14 +30,36 @@ public class GitHubService : IGitHubService
         _organization = configuration["GitHub:Organization"]
             ?? throw new InvalidOperationException("GitHub:Organization appsettings içinde yapılandırılmamış.");
 
-        // Defaults to public GitHub's API host; set GitHub:ApiBaseUrl (e.g. "https://git.company.com/api/v3/")
+        // Defaults to public GitHub's API host; set GitHub:ApiBaseUrl (e.g. "https://git.company.com/")
         // to point at a self-hosted GitHub Enterprise Server instance instead.
         var apiBaseUrl = configuration["GitHub:ApiBaseUrl"];
-        _httpClient.BaseAddress = new Uri(string.IsNullOrWhiteSpace(apiBaseUrl) ? "https://api.github.com/" : apiBaseUrl);
+        _httpClient.BaseAddress = new Uri(NormalizeApiBaseUrl(apiBaseUrl));
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CodeInsightAI");
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         _httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    // GitHub Enterprise Server's REST API lives under /api/v3, not at the domain root - add it
+    // automatically if a bare host URL (e.g. "https://git.company.com") was configured, so a request
+    // like "orgs/{org}/repos" doesn't silently hit the web UI (returning an HTML page instead of JSON,
+    // which fails to deserialize) instead of the actual API.
+    private static string NormalizeApiBaseUrl(string? apiBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(apiBaseUrl))
+        {
+            return "https://api.github.com/";
+        }
+
+        var trimmed = apiBaseUrl.TrimEnd('/');
+
+        if (!trimmed.Contains("/api/v3", StringComparison.OrdinalIgnoreCase)
+            && !trimmed.Contains("api.github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed += "/api/v3";
+        }
+
+        return trimmed + "/";
     }
 
     // Auto-discovers every repo in the configured GitHub organization, rather than requiring each
