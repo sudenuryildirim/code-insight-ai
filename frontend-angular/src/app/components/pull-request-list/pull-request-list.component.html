@@ -26,18 +26,44 @@
     </div>
 
     <p class="hint">
-      Listelenen PR'lar, backend'de yapılandırılmış GitHub organizasyonundan canlı çekilir. "İncele" butonu, PR'ın
-      amacını, olası hata/güvenlik sorunlarını ve mevcut kodla tutarlılığını raporlar — onay veya merge işlemini bu
-      sistem yapmaz, karar her zaman sizindir.
+      Listelenen PR'lar, backend'de yapılandırılmış GitHub organizasyonundan canlı çekilir. Aşağıdaki listeden bir
+      PR seçin, isterseniz analiz için özel bir talimat yazın ve "Sorgula"ya basın — PR'ın amacını, olası
+      hata/güvenlik sorunlarını ve mevcut kodla tutarlılığını raporlar; onay veya merge işlemini bu sistem yapmaz,
+      karar her zaman sizindir.
     </p>
 
-    <div class="instruction-row">
-      <input
-        type="text"
-        class="instruction-input"
-        placeholder="İsteğe bağlı: analiz için özel talimat (örn. sadece güvenlik açıklarına odaklan)"
-        [(ngModel)]="customInstruction"
-      />
+    <div class="query-composer">
+      <div class="query-target">
+        <ng-container *ngIf="selectedPrForQuery; else noPrSelected">
+          <span class="query-target-badge">#{{ selectedPrForQuery.number }}</span>
+          <span class="query-target-title">{{ selectedPrForQuery.title }}</span>
+        </ng-container>
+        <ng-template #noPrSelected>
+          <span class="query-target-empty">Sorgulamak için aşağıdaki listeden bir PR seçin</span>
+        </ng-template>
+      </div>
+      <div class="query-input-row">
+        <input
+          type="text"
+          class="query-input"
+          placeholder="İsteğe bağlı: özel analiz talimatı (örn. sadece güvenlik açıklarına odaklan) - boş bırakılırsa standart analiz çalışır"
+          [(ngModel)]="customInstruction"
+          [disabled]="!selectedPrForQuery"
+          (keyup.enter)="runQuery()"
+        />
+        <button
+          type="button"
+          class="query-submit-btn"
+          [disabled]="!selectedPrForQuery || reviewingNumber === selectedPrForQuery.number"
+          (click)="runQuery()"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          {{ selectedPrForQuery && reviewingNumber === selectedPrForQuery.number ? 'Sorgulanıyor…' : 'Sorgula' }}
+        </button>
+      </div>
     </div>
 
     <p class="error-box" *ngIf="reposError">{{ reposError }}</p>
@@ -45,8 +71,14 @@
     <p class="error-box" *ngIf="reviewError">{{ reviewError }}</p>
 
     <div class="pr-list" *ngIf="pullRequests.length > 0; else emptyState">
-      <div class="pr-row" *ngFor="let pr of pullRequests">
+      <div
+        class="pr-row"
+        *ngFor="let pr of pullRequests"
+        [class.selected]="selectedPrForQuery?.number === pr.number"
+        (click)="selectPrForQuery(pr)"
+      >
         <div class="pr-row-main">
+          <span class="pr-select-dot" [class.active]="selectedPrForQuery?.number === pr.number"></span>
           <span class="pr-number">#{{ pr.number }}</span>
           <div class="pr-row-body">
             <span class="pr-title">{{ pr.title }}</span>
@@ -58,14 +90,6 @@
         </div>
         <div class="pr-row-side">
           <span class="pr-updated">{{ pr.updatedAt | date: 'd MMM, HH:mm' }}</span>
-          <button
-            type="button"
-            class="btn btn-primary"
-            [disabled]="reviewingNumber === pr.number"
-            (click)="reviewPullRequest(pr.number)"
-          >
-            {{ reviewingNumber === pr.number ? 'İnceleniyor…' : 'İncele' }}
-          </button>
         </div>
       </div>
     </div>

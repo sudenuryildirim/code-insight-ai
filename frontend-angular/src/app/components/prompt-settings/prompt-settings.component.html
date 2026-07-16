@@ -1,0 +1,42 @@
+<div class="modal-backdrop" (click)="close()">
+  <div class="modal-panel" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>AI Analiz Talimatı</h2>
+        <p class="modal-subtitle">
+          Her PR analizinde kullanılan temel talimat. Buradaki değişiklik anında kaydedilir, kod
+          değişikliği veya yeniden dağıtım gerekmez.
+        </p>
+      </div>
+      <button type="button" class="close-btn" (click)="close()" aria-label="Kapat">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="loading-note" *ngIf="isLoading">Yükleniyor…</div>
+
+      <ng-container *ngIf="!isLoading">
+        <span class="default-badge" *ngIf="isDefault">Varsayılan talimat kullanılıyor</span>
+        <span class="custom-badge" *ngIf="!isDefault">Özelleştirilmiş talimat kullanılıyor</span>
+
+        <textarea
+          class="prompt-textarea"
+          [(ngModel)]="promptText"
+          spellcheck="false"
+          rows="16"
+        ></textarea>
+
+        <p class="error-box" *ngIf="error">{{ error }}</p>
+        <p class="saved-note" *ngIf="savedNotice">Kaydedildi.</p>
+      </ng-container>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" [disabled]="isResetting || isLoading" (click)="resetToDefault()">
+        {{ isResetting ? 'Sıfırlanıyor…' : 'Varsayılana Döndür' }}
+      </button>
+      <button type="button" class="btn btn-primary" [disabled]="isSaving || isLoading" (click)="save()">
+        {{ isSaving ? 'Kaydediliyor…' : 'Kaydet' }}
+      </button>
+    </div>
+  </div>
+</div>

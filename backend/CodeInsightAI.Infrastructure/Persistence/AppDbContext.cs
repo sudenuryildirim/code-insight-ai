@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<PullRequestReport> PullRequestReports => Set<PullRequestReport>();
+    public DbSet<SystemPromptSetting> SystemPromptSettings => Set<SystemPromptSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CodeInsightAI.Application.AI;
 using CodeInsightAI.Application.DTOs;
 using CodeInsightAI.Application.Interfaces;
 using CodeInsightAI.Domain.Entities;
@@ -12,12 +13,14 @@ namespace CodeInsightAI.Infrastructure.AI;
 public class GeminiAIService : IAIService
 {
     private readonly HttpClient _httpClient;
+    private readonly ISystemPromptRepository _systemPromptRepository;
     private readonly string _apiKey;
     private readonly string _model;
 
-    public GeminiAIService(HttpClient httpClient, IConfiguration configuration)
+    public GeminiAIService(HttpClient httpClient, ISystemPromptRepository systemPromptRepository, IConfiguration configuration)
     {
         _httpClient = httpClient;
+        _systemPromptRepository = systemPromptRepository;
         _apiKey = configuration["Gemini:ApiKey"] ?? throw new InvalidOperationException("Gemini API key is not configured.");
         _model = configuration["Gemini:Model"] ?? "gemini-2.5-flash";
     }
@@ -26,22 +29,9 @@ public class GeminiAIService : IAIService
     {
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}";
 
-        var systemPrompt = @"Sen bir yazılım ekibinde pull request'leri gözden geçiren, kıdemli bir kod reviewer ve güvenlik uzmanısın.
-Görevin, sana verilen pull request'in diff'ini (ve mümkünse ilgili dosyaların PR sonrası tam içeriğini) inceleyip aşağıdaki soruları SON DERECE DETAYLI ve AÇIKLAYICI şekilde yanıtlamaktır:
-
-1. Bu PR'ın amacı ne? Başlık, açıklama ve diff'e bakarak PR'ın hangi problemi çözmeye veya hangi özelliği eklemeye çalıştığını en az 1-2 uzun paragrafla açıkla.
-2. Değişiklikte bug, mantık hatası veya çalışma zamanı hatası olasılığı var mı?
-3. OWASP Top 10 standartlarına göre güvenlik açığı (SQL Injection, XSS, hardcoded secret/api key, eksik doğrulama, zayıf algoritma vb.) var mı?
-4. Değişiklik, dosyanın (ve varsa projenin) geri kalanıyla TUTARLI mı? Mevcut isimlendirme, mimari desenler, hata yönetimi biçimiyle çelişen bir şey var mı? (Bunun için sana dosyaların PR sonrası tam içeriği de verildiyse onu bağlam olarak kullan.)
-5. Performans problemi, gereksiz döngü veya kötü kod kokusu var mı?
-
-Kurallar:
-- SEN ONAY (approve) YA DA MERGE KARARI VERMEZSİN. Sadece bulgularını raporlarsın; nihai karar her zaman bir insana aittir. 'verdict' alanına sadece bulgularını özetleyen kısa bir etiket yaz (örn. 'Onaya Hazır Görünüyor', 'Küçük Düzeltmeler Önerilir', 'Değişiklik Gerekli', 'Riskli - Dikkatli İncelenmeli').
-- reliabilityScore, PR'ın genel güvenilirliğini 0-100 arası bir sayı ile ifade eder (bug/güvenlik/tutarlılık sorunları düştükçe skor düşer).
-- Her tespit edilen sorun için: sorunun NEDEN bir sorun olduğunu, risklerini ve somut bir ÇÖZÜM ÖNERİSİni detaylı yaz; mümkünse refactoredCode ver.
-- detectedPurpose ve summary alanlarını asla kısa geçme.
-- Yanıt dilin her zaman TÜRKÇE olmalıdır (kod içindeki teknik terimler İngilizce kalabilir).
-- Analiz sonucunu JSON formatında döndür.";
+        // Editable from the app's settings screen instead of being hardcoded - falls back to the
+        // built-in default until the user customizes it.
+        var systemPrompt = await _systemPromptRepository.GetCustomPromptAsync() ?? DefaultSystemPrompt.Text;
 
         if (!string.IsNullOrWhiteSpace(customInstruction))
         {

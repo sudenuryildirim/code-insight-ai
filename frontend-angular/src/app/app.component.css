@@ -12,12 +12,35 @@
   max-width: 1120px;
   margin: 0 auto;
   padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.settings-btn:hover {
+  border-color: var(--navy);
+  color: var(--navy);
 }
 
 .mark {

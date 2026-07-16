@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseSqlite(configuration.GetConnectionString("Default")));
         services.AddScoped<IPullRequestReviewRepository, PullRequestReviewRepository>();
+        services.AddScoped<ISystemPromptRepository, SystemPromptRepository>();
 
         return services;
     }

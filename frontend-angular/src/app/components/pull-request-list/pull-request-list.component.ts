@@ -41,6 +41,10 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
   // built-in checklist. Applies to whichever PR's "İncele"/"Yeniden Analiz Et" is clicked next.
   customInstruction = '';
 
+  // The PR the user has picked from the list to run the query composer against - selecting is a
+  // separate step from analyzing, so they can type/edit an instruction before triggering it.
+  selectedPrForQuery: PullRequestSummary | null = null;
+
   constructor(
     private readonly pullRequestService: PullRequestService,
     private readonly liveService: PullRequestLiveService,
@@ -101,6 +105,7 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
 
     this.isLoadingList = true;
     this.listError = null;
+    this.selectedPrForQuery = null;
 
     this.pullRequestService.getOpenPullRequests(owner, repo).subscribe({
       next: (pullRequests) => {
@@ -113,6 +118,17 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
         this.isLoadingList = false;
       },
     });
+  }
+
+  selectPrForQuery(pr: PullRequestSummary): void {
+    this.selectedPrForQuery = pr;
+  }
+
+  runQuery(): void {
+    if (!this.selectedPrForQuery) {
+      return;
+    }
+    this.reviewPullRequest(this.selectedPrForQuery.number);
   }
 
   reviewPullRequest(number: number, force = false): void {
