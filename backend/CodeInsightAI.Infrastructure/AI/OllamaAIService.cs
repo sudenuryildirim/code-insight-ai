@@ -28,7 +28,7 @@ public class OllamaAIService : IAIService
         _model = configuration["Ollama:Model"] ?? "gpt-oss:20b";
     }
 
-    public async Task<PullRequestReport> AnalyzePullRequestAsync(PullRequestDiffContext context)
+    public async Task<PullRequestReport> AnalyzePullRequestAsync(PullRequestDiffContext context, string? customInstruction = null)
     {
         var systemPrompt = @"Sen bir yazılım ekibinde pull request'leri gözden geçiren, kıdemli bir kod reviewer ve güvenlik uzmanısın.
 Görevin, sana verilen pull request'in diff'ini (ve mümkünse ilgili dosyaların PR sonrası tam içeriğini) inceleyip aşağıdaki soruları SON DERECE DETAYLI ve AÇIKLAYICI şekilde yanıtlamaktır:
@@ -46,6 +46,17 @@ Kurallar:
 - detectedPurpose ve summary alanlarını asla kısa geçme.
 - Yanıt dilin her zaman TÜRKÇE olmalıdır (kod içindeki teknik terimler İngilizce kalabilir).
 - Analiz sonucunu, sana verilen JSON şemasına birebir uyan bir JSON nesnesi olarak döndür.";
+
+        if (!string.IsNullOrWhiteSpace(customInstruction))
+        {
+            systemPrompt += $@"
+
+Kullanıcının bu inceleme için ek özel talebi:
+""{customInstruction.Trim()}""
+Bu talebi yukarıdaki standart kontrol listesine EK olarak dikkate al - standart kontrolleri (bug,
+güvenlik, tutarlılık, performans) atlama, sadece bu isteğe de özellikle odaklan ve bulgularını
+yine issues/summary alanlarına yansıt.";
+        }
 
         var filesSection = new StringBuilder();
         foreach (var file in context.Files)
@@ -67,6 +78,16 @@ Kurallar:
             filesSection.AppendLine();
         }
 
+        var rawDiffSection = string.IsNullOrWhiteSpace(context.RawDiff)
+            ? string.Empty
+            : $@"PR'ın tam birleştirilmiş diff'i (dosya bazlı patch'ler eksik/kesilmiş olsa bile bu bölüm PR'daki
+gerçek değişikliklerin eksiksiz halidir - analizini öncelikle buna dayandır):
+```diff
+{Truncate(context.RawDiff, 60000)}
+```
+
+";
+
         var promptText = $@"Repo: {context.RepoOwner}/{context.RepoName}
 PR #{context.PrNumber}: {context.PrTitle}
 Yazan: {context.Author}
@@ -75,7 +96,7 @@ Branch: {context.HeadBranch} -> {context.BaseBranch}
 PR Açıklaması:
 {(string.IsNullOrWhiteSpace(context.PrDescription) ? "(açıklama girilmemiş)" : context.PrDescription)}
 
-Değişen dosyalar ({context.Files.Count} adet):
+{rawDiffSection}Değişen dosyalar ({context.Files.Count} adet):
 
 {filesSection}";
 

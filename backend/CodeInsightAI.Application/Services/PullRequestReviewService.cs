@@ -32,11 +32,12 @@ public class PullRequestReviewService : IPullRequestReviewService
         return _gitHubService.GetOpenPullRequestsAsync(owner, repo);
     }
 
-    public async Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false)
+    public async Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false, string? customInstruction = null)
     {
         var context = await _gitHubService.GetPullRequestDiffAsync(owner, repo, prNumber);
+        var hasCustomInstruction = !string.IsNullOrWhiteSpace(customInstruction);
 
-        if (!forceRefresh)
+        if (!forceRefresh && !hasCustomInstruction)
         {
             var cached = await _repository.GetLatestReviewAsync(context.RepoOwner, context.RepoName, prNumber, context.HeadSha);
             if (cached != null)
@@ -45,7 +46,7 @@ public class PullRequestReviewService : IPullRequestReviewService
             }
         }
 
-        var report = await _aiService.AnalyzePullRequestAsync(context);
+        var report = await _aiService.AnalyzePullRequestAsync(context, customInstruction);
 
         // A failed analysis leaves HeadSha empty (see OllamaAIService) - never cache those,
         // otherwise a transient AI failure would get served forever for this commit.

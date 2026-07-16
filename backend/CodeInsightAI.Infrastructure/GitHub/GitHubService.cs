@@ -135,8 +135,38 @@ public class GitHubService : IGitHubService
             BaseBranch = pr.Base.Ref,
             HeadBranch = pr.Head.Ref,
             HeadSha = pr.Head.Sha,
-            Files = fileChanges
+            Files = fileChanges,
+            RawDiff = await TryGetRawDiffAsync(owner, repo, prNumber)
         };
+    }
+
+    // GitHub omits the per-file "patch" field once a PR's diff is large enough (common for PRs
+    // touching dozens of files) - the files list still comes back, but every file's Patch is null,
+    // which previously made it look to the AI like there was no diff at all despite the PR clearly
+    // having one. Requesting the PR itself with the "diff" media type instead returns the full
+    // unified diff as one plain-text block, which isn't subject to that per-file omission.
+    private async Task<string> TryGetRawDiffAsync(string owner, string repo, int prNumber)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"repos/{owner}/{repo}/pulls/{prNumber}");
+            request.Headers.Accept.Clear();
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.diff"));
+
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                return string.Empty;
+            }
+
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch
+        {
+            // Best-effort - the per-file patches (and full file content) still give the AI something
+            // to work with even if this fails (e.g. the PR's diff exceeds GitHub's size limit for it).
+            return string.Empty;
+        }
     }
 
     public async Task PostReviewCommentAsync(string owner, string repo, int prNumber, string markdownBody)

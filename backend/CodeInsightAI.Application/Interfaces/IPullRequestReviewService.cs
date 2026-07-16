@@ -9,7 +9,10 @@ public interface IPullRequestReviewService
 
     Task<List<PullRequestSummaryDto>> GetOpenPullRequestsAsync(string owner, string repo);
 
-    Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false);
+    // customInstruction lets the user steer this specific analysis (e.g. "sadece güvenlik açıklarına
+    // odaklan") on top of the standard checklist. Providing one always calls the AI fresh, the same
+    // as forceRefresh - a custom-instruction result isn't what a plain "İncele" click should get back.
+    Task<PullRequestReport> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool forceRefresh = false, string? customInstruction = null);
 
     Task<List<PullRequestReport>> GetReviewHistoryAsync(string owner, string repo, int prNumber);
 

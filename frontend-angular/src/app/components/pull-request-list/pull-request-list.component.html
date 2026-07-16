@@ -31,6 +31,15 @@
       sistem yapmaz, karar her zaman sizindir.
     </p>
 
+    <div class="instruction-row">
+      <input
+        type="text"
+        class="instruction-input"
+        placeholder="İsteğe bağlı: analiz için özel talimat (örn. sadece güvenlik açıklarına odaklan)"
+        [(ngModel)]="customInstruction"
+      />
+    </div>
+
     <p class="error-box" *ngIf="reposError">{{ reposError }}</p>
     <p class="error-box" *ngIf="listError">{{ listError }}</p>
     <p class="error-box" *ngIf="reviewError">{{ reviewError }}</p>
@@ -83,6 +92,12 @@
       </button>
     </div>
     <div class="review-history-actions">
+      <input
+        type="text"
+        class="instruction-input reanalyze-instruction"
+        placeholder="İsteğe bağlı: yeniden analiz için özel talimat"
+        [(ngModel)]="customInstruction"
+      />
       <button type="button" class="btn btn-ghost reanalyze-btn" [disabled]="isReanalyzing" (click)="reanalyze()">
         {{ isReanalyzing ? 'Yeniden Analiz Ediliyor…' : 'Yeniden Analiz Et' }}
       </button>

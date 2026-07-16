@@ -51,12 +51,14 @@ public class PullRequestController : ControllerBase
     // This never approves or merges anything on GitHub - the merge decision stays with a human.
     // If a review already exists for the PR's current head commit, it's returned instantly
     // without a new AI call - pass force=true to bypass that cache and re-analyze anyway.
+    // An optional body.instruction lets the caller steer this specific analysis; providing one
+    // always triggers a fresh AI call, same as force=true.
     [HttpPost("{owner}/{repo}/{number:int}/review")]
-    public async Task<IActionResult> ReviewPullRequest(string owner, string repo, int number, [FromQuery] bool force = false)
+    public async Task<IActionResult> ReviewPullRequest(string owner, string repo, int number, [FromQuery] bool force = false, [FromBody] ReviewRequestBody? body = null)
     {
         try
         {
-            var report = await _pullRequestReviewService.ReviewPullRequestAsync(owner, repo, number, force);
+            var report = await _pullRequestReviewService.ReviewPullRequestAsync(owner, repo, number, force, body?.Instruction);
             return Ok(report);
         }
         catch (Exception ex)
@@ -114,4 +116,9 @@ public class PullRequestController : ControllerBase
             return StatusCode(500, new { message = "PDF oluşturulurken sunucu hatası oluştu.", error = ex.Message });
         }
     }
+}
+
+public class ReviewRequestBody
+{
+    public string? Instruction { get; set; }
 }

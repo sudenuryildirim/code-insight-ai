@@ -28,4 +28,13 @@ public class PullRequestDiffContext
     public string HeadBranch { get; set; } = string.Empty;
     public string HeadSha { get; set; } = string.Empty;
     public List<PullRequestFileChange> Files { get; set; } = new();
+
+    /// <summary>
+    /// The full unified diff for the PR, fetched as one block via GitHub's "diff" media type.
+    /// GitHub omits the per-file "patch" field once a PR's diff is large enough (common for PRs
+    /// touching dozens of files), which otherwise starves the AI of any real diff to review even
+    /// though a diff clearly exists. Empty if the fetch failed or the PR's diff exceeds GitHub's
+    /// own size limit for this media type.
+    /// </summary>
+    public string RawDiff { get; set; } = string.Empty;
 }

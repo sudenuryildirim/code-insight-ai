@@ -34,6 +34,34 @@
   gap: 8px;
 }
 
+.instruction-row {
+  display: flex;
+}
+
+.instruction-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  transition: border-color 0.15s var(--ease);
+}
+
+.instruction-input::placeholder {
+  color: var(--text-muted);
+}
+
+.instruction-input:focus {
+  border-color: var(--navy);
+}
+
+.reanalyze-instruction {
+  max-width: 320px;
+}
+
 .repo-chip {
   background: var(--surface);
   border: 1px solid var(--border-strong);

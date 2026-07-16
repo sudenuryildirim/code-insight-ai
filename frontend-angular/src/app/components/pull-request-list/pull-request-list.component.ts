@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { PullRequestService } from '../../services/pull-request.service';
@@ -9,7 +10,7 @@ import { CodeReviewReport, PullRequestReport, PullRequestSummary, RepositoryRef 
 @Component({
   selector: 'app-pull-request-list',
   standalone: true,
-  imports: [CommonModule, ReportViewComponent],
+  imports: [CommonModule, FormsModule, ReportViewComponent],
   templateUrl: './pull-request-list.component.html',
   styleUrl: './pull-request-list.component.css',
 })
@@ -34,6 +35,11 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
 
   isLive = false;
   private readonly liveSubscriptions = new Subscription();
+
+  // Optional free-text instruction that steers the AI's focus for the next analysis (e.g. "sadece
+  // güvenlik açıklarına odaklan") - sent alongside the diff instead of relying purely on the fixed
+  // built-in checklist. Applies to whichever PR's "İncele"/"Yeniden Analiz Et" is clicked next.
+  customInstruction = '';
 
   constructor(
     private readonly pullRequestService: PullRequestService,
@@ -122,7 +128,7 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
     }
     this.reviewError = null;
 
-    this.pullRequestService.reviewPullRequest(owner, repo, number, force).subscribe({
+    this.pullRequestService.reviewPullRequest(owner, repo, number, force, this.customInstruction).subscribe({
       next: (report) => {
         this.selectedReport = report;
         this.reviewingNumber = null;
