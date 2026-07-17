@@ -33,14 +33,25 @@ public class GeminiAIService : IAIService
         // built-in default until the user customizes it.
         var systemPrompt = await _systemPromptRepository.GetCustomPromptAsync() ?? DefaultSystemPrompt.Text;
 
+        // When the full raw diff came through, per-file patches would just be the same content
+        // repeated a second time - wasteful at best, and at worst it crowds a large multi-file PR's
+        // per-file patches + full contents out of the model's context window before the model ever
+        // gets to the (more complete) raw diff section below. Only fall back to per-file patches when
+        // there's no raw diff to rely on.
+        var hasRawDiff = !string.IsNullOrWhiteSpace(context.RawDiff);
+
         var filesSection = new StringBuilder();
         foreach (var file in context.Files)
         {
             filesSection.AppendLine($"### Dosya: {file.FileName}");
-            filesSection.AppendLine("Diff (patch):");
-            filesSection.AppendLine("```diff");
-            filesSection.AppendLine(Truncate(file.Patch, 8000));
-            filesSection.AppendLine("```");
+
+            if (!hasRawDiff)
+            {
+                filesSection.AppendLine("Diff (patch):");
+                filesSection.AppendLine("```diff");
+                filesSection.AppendLine(Truncate(file.Patch, 8000));
+                filesSection.AppendLine("```");
+            }
 
             if (!string.IsNullOrWhiteSpace(file.FullContent))
             {
@@ -58,7 +69,7 @@ public class GeminiAIService : IAIService
             : $@"PR'ın tam birleştirilmiş diff'i (dosya bazlı patch'ler eksik/kesilmiş olsa bile bu bölüm PR'daki
 gerçek değişikliklerin eksiksiz halidir - analizini öncelikle buna dayandır):
 ```diff
-{Truncate(context.RawDiff, 60000)}
+{Truncate(context.RawDiff, 300000)}
 ```
 
 ";

@@ -18,6 +18,7 @@ public class OllamaAIService : IAIService
     private readonly HttpClient _httpClient;
     private readonly ISystemPromptRepository _systemPromptRepository;
     private readonly string _model;
+    private readonly int _numCtx;
 
     public OllamaAIService(HttpClient httpClient, ISystemPromptRepository systemPromptRepository, IConfiguration configuration)
     {
@@ -29,6 +30,13 @@ public class OllamaAIService : IAIService
         _httpClient.BaseAddress = new Uri(normalizedBaseUrl);
 
         _model = configuration["Ollama:Model"] ?? "gpt-oss:20b";
+
+        // Without an explicit num_ctx, Ollama falls back to a small runtime default (commonly a few
+        // thousand tokens) regardless of what the model itself supports - it SILENTLY drops whatever
+        // doesn't fit, which looks exactly like "the diff is there but comes back incomplete" even
+        // though the full diff was sent. Raise it well past what a large PR's prompt needs; lower it
+        // in appsettings (Ollama:NumCtx) if the host doesn't have enough RAM/VRAM for this.
+        _numCtx = configuration.GetValue<int?>("Ollama:NumCtx") ?? 65536;
     }
 
     public async Task<PullRequestReport> AnalyzePullRequestAsync(PullRequestDiffContext context)
@@ -37,14 +45,25 @@ public class OllamaAIService : IAIService
         // built-in default until the user customizes it.
         var systemPrompt = await _systemPromptRepository.GetCustomPromptAsync() ?? DefaultSystemPrompt.Text;
 
+        // When the full raw diff came through, per-file patches would just be the same content
+        // repeated a second time - wasteful at best, and at worst it crowds a large multi-file PR's
+        // per-file patches + full contents out of the model's context window before the model ever
+        // gets to the (more complete) raw diff section below. Only fall back to per-file patches when
+        // there's no raw diff to rely on.
+        var hasRawDiff = !string.IsNullOrWhiteSpace(context.RawDiff);
+
         var filesSection = new StringBuilder();
         foreach (var file in context.Files)
         {
             filesSection.AppendLine($"### Dosya: {file.FileName}");
-            filesSection.AppendLine("Diff (patch):");
-            filesSection.AppendLine("```diff");
-            filesSection.AppendLine(Truncate(file.Patch, 8000));
-            filesSection.AppendLine("```");
+
+            if (!hasRawDiff)
+            {
+                filesSection.AppendLine("Diff (patch):");
+                filesSection.AppendLine("```diff");
+                filesSection.AppendLine(Truncate(file.Patch, 8000));
+                filesSection.AppendLine("```");
+            }
 
             if (!string.IsNullOrWhiteSpace(file.FullContent))
             {
@@ -62,7 +81,7 @@ public class OllamaAIService : IAIService
             : $@"PR'ın tam birleştirilmiş diff'i (dosya bazlı patch'ler eksik/kesilmiş olsa bile bu bölüm PR'daki
 gerçek değişikliklerin eksiksiz halidir - analizini öncelikle buna dayandır):
 ```diff
-{Truncate(context.RawDiff, 60000)}
+{Truncate(context.RawDiff, 200000)}
 ```
 
 ";
@@ -88,6 +107,9 @@ PR Açıklaması:
                 new { role = "system", content = systemPrompt },
                 new { role = "user", content = promptText },
             },
+            // Without this, Ollama silently truncates the prompt to its own runtime default context
+            // length instead of the model's actual max - see the _numCtx comment in the constructor.
+            options = new { num_ctx = _numCtx },
             // Ollama's structured-output support: constrains the model's response to this JSON Schema.
             format = new
             {
