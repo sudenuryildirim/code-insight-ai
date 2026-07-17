@@ -18,10 +18,9 @@ export class PullRequestService {
     return this.http.get<PullRequestSummary[]>(`${this.baseUrl}/${owner}/${repo}/open`);
   }
 
-  reviewPullRequest(owner: string, repo: string, number: number, force = false, instruction = ''): Observable<PullRequestReport> {
+  reviewPullRequest(owner: string, repo: string, number: number, force = false): Observable<PullRequestReport> {
     const query = force ? '?force=true' : '';
-    const body = instruction.trim() ? { instruction: instruction.trim() } : {};
-    return this.http.post<PullRequestReport>(`${this.baseUrl}/${owner}/${repo}/${number}/review${query}`, body);
+    return this.http.post<PullRequestReport>(`${this.baseUrl}/${owner}/${repo}/${number}/review${query}`, {});
   }
 
   getReviewHistory(owner: string, repo: string, number: number): Observable<PullRequestReport[]> {

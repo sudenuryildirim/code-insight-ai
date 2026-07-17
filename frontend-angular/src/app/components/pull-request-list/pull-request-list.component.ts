@@ -1,5 +1,4 @@
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { PullRequestService } from '../../services/pull-request.service';
@@ -10,7 +9,7 @@ import { CodeReviewReport, PullRequestReport, PullRequestSummary, RepositoryRef 
 @Component({
   selector: 'app-pull-request-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReportViewComponent],
+  imports: [CommonModule, ReportViewComponent],
   templateUrl: './pull-request-list.component.html',
   styleUrl: './pull-request-list.component.css',
 })
@@ -35,15 +34,6 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
 
   isLive = false;
   private readonly liveSubscriptions = new Subscription();
-
-  // Optional free-text instruction that steers the AI's focus for the next analysis (e.g. "sadece
-  // güvenlik açıklarına odaklan") - sent alongside the diff instead of relying purely on the fixed
-  // built-in checklist. Applies to whichever PR's "İncele"/"Yeniden Analiz Et" is clicked next.
-  customInstruction = '';
-
-  // The PR the user has picked from the list to run the query composer against - selecting is a
-  // separate step from analyzing, so they can type/edit an instruction before triggering it.
-  selectedPrForQuery: PullRequestSummary | null = null;
 
   constructor(
     private readonly pullRequestService: PullRequestService,
@@ -105,7 +95,6 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
 
     this.isLoadingList = true;
     this.listError = null;
-    this.selectedPrForQuery = null;
 
     this.pullRequestService.getOpenPullRequests(owner, repo).subscribe({
       next: (pullRequests) => {
@@ -118,17 +107,6 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
         this.isLoadingList = false;
       },
     });
-  }
-
-  selectPrForQuery(pr: PullRequestSummary): void {
-    this.selectedPrForQuery = pr;
-  }
-
-  runQuery(): void {
-    if (!this.selectedPrForQuery) {
-      return;
-    }
-    this.reviewPullRequest(this.selectedPrForQuery.number);
   }
 
   reviewPullRequest(number: number, force = false): void {
@@ -144,7 +122,7 @@ export class PullRequestListComponent implements OnInit, OnDestroy {
     }
     this.reviewError = null;
 
-    this.pullRequestService.reviewPullRequest(owner, repo, number, force, this.customInstruction).subscribe({
+    this.pullRequestService.reviewPullRequest(owner, repo, number, force).subscribe({
       next: (report) => {
         this.selectedReport = report;
         this.reviewingNumber = null;

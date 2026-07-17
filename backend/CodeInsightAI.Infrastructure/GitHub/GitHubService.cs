@@ -3,6 +3,7 @@ using System.Text.Json;
 using CodeInsightAI.Application.DTOs;
 using CodeInsightAI.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace CodeInsightAI.Infrastructure.GitHub;
 
@@ -14,12 +15,14 @@ public class GitHubService : IGitHubService
     private const int MaxFileSizeBytesForFullContent = 50_000;
 
     private readonly HttpClient _httpClient;
+    private readonly ILogger<GitHubService> _logger;
     private readonly string _organization;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public GitHubService(HttpClient httpClient, IConfiguration configuration)
+    public GitHubService(HttpClient httpClient, ILogger<GitHubService> logger, IConfiguration configuration)
     {
         _httpClient = httpClient;
+        _logger = logger;
 
         var token = configuration["GitHub:Token"];
         if (string.IsNullOrWhiteSpace(token))
@@ -136,38 +139,70 @@ public class GitHubService : IGitHubService
             HeadBranch = pr.Head.Ref,
             HeadSha = pr.Head.Sha,
             Files = fileChanges,
-            RawDiff = await TryGetRawDiffAsync(owner, repo, prNumber)
+            RawDiff = await TryGetRawDiffAsync(owner, repo, prNumber, pr.Base.Sha, pr.Head.Sha)
         };
     }
 
     // GitHub omits the per-file "patch" field once a PR's diff is large enough (common for PRs
     // touching dozens of files) - the files list still comes back, but every file's Patch is null,
     // which previously made it look to the AI like there was no diff at all despite the PR clearly
-    // having one. Requesting the PR itself with the "diff" media type instead returns the full
-    // unified diff as one plain-text block, which isn't subject to that per-file omission.
-    private async Task<string> TryGetRawDiffAsync(string owner, string repo, int prNumber)
+    // having one. Requesting the diff media type instead returns the full unified diff as one
+    // plain-text block, which isn't subject to that per-file omission.
+    //
+    // Two different endpoints are tried because GitHub Enterprise Server versions vary in which one
+    // honors the "diff" media type reliably: the PR endpoint first, then the base...head compare
+    // endpoint as a fallback. Failures are logged (rather than silently swallowed) so a bad response
+    // from a specific GHES instance is actually visible in the backend logs instead of just showing
+    // up as "no diff" to the end user with no way to diagnose why.
+    private async Task<string> TryGetRawDiffAsync(string owner, string repo, int prNumber, string baseSha, string headSha)
+    {
+        var diff = await TryFetchDiffAsync($"repos/{owner}/{repo}/pulls/{prNumber}", $"{owner}/{repo}#{prNumber} (pulls endpoint)");
+        if (!string.IsNullOrEmpty(diff))
+        {
+            return diff;
+        }
+
+        return await TryFetchDiffAsync($"repos/{owner}/{repo}/compare/{baseSha}...{headSha}", $"{owner}/{repo}#{prNumber} (compare endpoint)");
+    }
+
+    private async Task<string> TryFetchDiffAsync(string relativeUrl, string logContext)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"repos/{owner}/{repo}/pulls/{prNumber}");
+            using var request = new HttpRequestMessage(HttpMethod.Get, relativeUrl);
             request.Headers.Accept.Clear();
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.diff"));
 
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
+                _logger.LogWarning("Raw diff fetch for {LogContext} failed with {StatusCode}.", logContext, response.StatusCode);
                 return string.Empty;
             }
 
-            return await response.Content.ReadAsStringAsync();
+            var content = await response.Content.ReadAsStringAsync();
+
+            // Some GitHub Enterprise Server setups return a 200 with an HTML page (e.g. an auth
+            // redirect) instead of honoring the diff media type - a real diff always starts like this.
+            if (!content.TrimStart().StartsWith("diff --git", StringComparison.Ordinal))
+            {
+                _logger.LogWarning(
+                    "Raw diff fetch for {LogContext} did not return a real diff ({Length} chars, starts with '{Preview}').",
+                    logContext, content.Length, Truncate(content, 60));
+                return string.Empty;
+            }
+
+            return content;
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort - the per-file patches (and full file content) still give the AI something
-            // to work with even if this fails (e.g. the PR's diff exceeds GitHub's size limit for it).
+            _logger.LogWarning(ex, "Raw diff fetch for {LogContext} threw an exception.", logContext);
             return string.Empty;
         }
     }
+
+    private static string Truncate(string value, int maxLength)
+        => value.Length <= maxLength ? value : value[..maxLength];
 
     public async Task PostReviewCommentAsync(string owner, string repo, int prNumber, string markdownBody)
     {

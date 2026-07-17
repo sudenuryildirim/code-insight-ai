@@ -31,22 +31,11 @@ public class OllamaAIService : IAIService
         _model = configuration["Ollama:Model"] ?? "gpt-oss:20b";
     }
 
-    public async Task<PullRequestReport> AnalyzePullRequestAsync(PullRequestDiffContext context, string? customInstruction = null)
+    public async Task<PullRequestReport> AnalyzePullRequestAsync(PullRequestDiffContext context)
     {
         // Editable from the app's settings screen instead of being hardcoded - falls back to the
         // built-in default until the user customizes it.
         var systemPrompt = await _systemPromptRepository.GetCustomPromptAsync() ?? DefaultSystemPrompt.Text;
-
-        if (!string.IsNullOrWhiteSpace(customInstruction))
-        {
-            systemPrompt += $@"
-
-Kullanıcının bu inceleme için ek özel talebi:
-""{customInstruction.Trim()}""
-Bu talebi yukarıdaki standart kontrol listesine EK olarak dikkate al - standart kontrolleri (bug,
-güvenlik, tutarlılık, performans) atlama, sadece bu isteğe de özellikle odaklan ve bulgularını
-yine issues/summary alanlarına yansıt.";
-        }
 
         var filesSection = new StringBuilder();
         foreach (var file in context.Files)

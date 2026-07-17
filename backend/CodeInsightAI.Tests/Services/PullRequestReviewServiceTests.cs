@@ -46,7 +46,7 @@ public class PullRequestReviewServiceTests
         var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5);
 
         Assert.Same(cached, result);
-        _aiService.Verify(a => a.AnalyzePullRequestAsync(It.IsAny<PullRequestDiffContext>(), It.IsAny<string?>()), Times.Never);
+        _aiService.Verify(a => a.AnalyzePullRequestAsync(It.IsAny<PullRequestDiffContext>()), Times.Never);
         _repository.Verify(r => r.SaveReviewAsync(It.IsAny<PullRequestReport>()), Times.Never);
     }
 
@@ -58,7 +58,7 @@ public class PullRequestReviewServiceTests
 
         _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
         _repository.Setup(r => r.GetLatestReviewAsync(Owner, Repo, 5, "sha-1")).ReturnsAsync((PullRequestReport?)null);
-        _aiService.Setup(a => a.AnalyzePullRequestAsync(context, null)).ReturnsAsync(freshReport);
+        _aiService.Setup(a => a.AnalyzePullRequestAsync(context)).ReturnsAsync(freshReport);
 
         var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5);
 
@@ -73,7 +73,7 @@ public class PullRequestReviewServiceTests
         var freshReport = new PullRequestReport { HeadSha = "sha-1", ReliabilityScore = 77 };
 
         _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
-        _aiService.Setup(a => a.AnalyzePullRequestAsync(context, null)).ReturnsAsync(freshReport);
+        _aiService.Setup(a => a.AnalyzePullRequestAsync(context)).ReturnsAsync(freshReport);
 
         var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5, forceRefresh: true);
 
@@ -91,7 +91,7 @@ public class PullRequestReviewServiceTests
 
         _gitHubService.Setup(g => g.GetPullRequestDiffAsync(Owner, Repo, 5)).ReturnsAsync(context);
         _repository.Setup(r => r.GetLatestReviewAsync(Owner, Repo, 5, "sha-1")).ReturnsAsync((PullRequestReport?)null);
-        _aiService.Setup(a => a.AnalyzePullRequestAsync(context, null)).ReturnsAsync(failedReport);
+        _aiService.Setup(a => a.AnalyzePullRequestAsync(context)).ReturnsAsync(failedReport);
 
         var result = await _service.ReviewPullRequestAsync(Owner, Repo, 5);
 
