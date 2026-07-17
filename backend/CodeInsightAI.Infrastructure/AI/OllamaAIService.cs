@@ -116,7 +116,7 @@ PR Açıklaması:
                                 suggestion = new { type = "string", description = "Somut çözüm önerisi" },
                                 refactoredCode = new { type = "string", description = "Düzeltilmiş kod bloğu" }
                             },
-                            required = new[] { "filePath", "lineNumber", "severity", "category", "title", "description", "suggestion" }
+                            required = new[] { "filePath", "lineNumber", "lineContent", "severity", "category", "title", "description", "suggestion" }
                         }
                     },
                     recommendations = new

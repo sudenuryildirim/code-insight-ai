@@ -66,23 +66,52 @@
     </ng-container>
   </div>
 
-  <!-- Issue detail + list -->
+  <!-- Issue list + detail -->
   <div class="grid-split grid-split-single">
     <div class="side-column">
+      <!-- Issue list -->
+      <section class="panel issue-list">
+        <h4>Bulgular ({{ filteredIssues.length }})</h4>
+        <div class="issue-scroll">
+          <button
+            type="button"
+            class="issue-item"
+            *ngFor="let issue of filteredIssues"
+            [class.active]="selectedIssue === issue"
+            (click)="selectIssue(issue)"
+          >
+            <div class="issue-item-head">
+              <span class="badge" [ngClass]="severityBadgeClass(issue.severity)">{{ issue.severity }}</span>
+              <span class="line-ref">{{ issue.filePath }}:{{ issue.lineNumber }}</span>
+            </div>
+            <span class="issue-title">{{ issue.title }}</span>
+            <span class="chip chip-muted">{{ categoryLabel(issue.category) }}</span>
+            <code class="issue-code-preview" *ngIf="issue.lineContent">{{ issue.lineContent }}</code>
+          </button>
+
+          <p class="empty-note" *ngIf="filteredIssues.length === 0">Seçili kategoride sorun bulunmuyor.</p>
+        </div>
+      </section>
+
       <!-- Selected issue detail -->
       <section class="panel issue-detail" *ngIf="selectedIssue; else noSelection">
         <div class="issue-detail-head">
           <div>
             <span class="badge" [ngClass]="severityBadgeClass(selectedIssue.severity)">{{ selectedIssue.severity }}</span>
             <span class="chip chip-muted">{{ categoryLabel(selectedIssue.category) }}</span>
-            <span class="chip chip-muted">{{ selectedIssue.filePath }}</span>
           </div>
-          <span class="line-ref">Satır {{ selectedIssue.lineNumber }}</span>
+          <span class="line-ref">{{ selectedIssue.filePath }}:{{ selectedIssue.lineNumber }}</span>
         </div>
 
         <h4>{{ selectedIssue.title }}</h4>
 
-        <pre class="code-block" *ngIf="selectedIssue.lineContent">{{ selectedIssue.lineContent }}</pre>
+        <div class="detail-block">
+          <h5>Kaynak Kod</h5>
+          <pre class="code-block" *ngIf="selectedIssue.lineContent; else noCode">{{ selectedIssue.lineContent }}</pre>
+          <ng-template #noCode>
+            <p class="code-missing-note">Bu bulgu için AI tarafından spesifik bir kod satırı belirtilmedi.</p>
+          </ng-template>
+        </div>
 
         <div class="detail-block">
           <h5>Sorun Açıklaması</h5>
@@ -102,33 +131,9 @@
 
       <ng-template #noSelection>
         <section class="panel empty-detail">
-          <p>Detayını görmek için aşağıdaki listeden bir bulguya tıklayın.</p>
+          <p>Detayını görmek için yukarıdaki listeden bir bulguya tıklayın.</p>
         </section>
       </ng-template>
-
-      <!-- Issue list -->
-      <section class="panel issue-list">
-        <h4>Bulgular ({{ filteredIssues.length }})</h4>
-        <div class="issue-scroll">
-          <button
-            type="button"
-            class="issue-item"
-            *ngFor="let issue of filteredIssues"
-            [class.active]="selectedIssue === issue"
-            (click)="selectIssue(issue)"
-          >
-            <div class="issue-item-head">
-              <span class="badge" [ngClass]="severityBadgeClass(issue.severity)">{{ issue.severity }}</span>
-              <span class="line-ref">Satır {{ issue.lineNumber }}</span>
-            </div>
-            <span class="issue-title">{{ issue.title }}</span>
-            <span class="chip chip-muted">{{ categoryLabel(issue.category) }}</span>
-            <span class="chip chip-muted">{{ issue.filePath }}</span>
-          </button>
-
-          <p class="empty-note" *ngIf="filteredIssues.length === 0">Seçili kategoride sorun bulunmuyor.</p>
-        </div>
-      </section>
     </div>
   </div>
 
