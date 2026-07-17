@@ -17,6 +17,7 @@ public class GitHubService : IGitHubService
     private readonly HttpClient _httpClient;
     private readonly ILogger<GitHubService> _logger;
     private readonly string _organization;
+    private readonly string _webBaseUrl;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public GitHubService(HttpClient httpClient, ILogger<GitHubService> logger, IConfiguration configuration)
@@ -37,6 +38,7 @@ public class GitHubService : IGitHubService
         // to point at a self-hosted GitHub Enterprise Server instance instead.
         var apiBaseUrl = configuration["GitHub:ApiBaseUrl"];
         _httpClient.BaseAddress = new Uri(NormalizeApiBaseUrl(apiBaseUrl));
+        _webBaseUrl = DeriveWebBaseUrl(apiBaseUrl);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CodeInsightAI");
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         _httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -60,6 +62,25 @@ public class GitHubService : IGitHubService
             && !trimmed.Contains("api.github.com", StringComparison.OrdinalIgnoreCase))
         {
             trimmed += "/api/v3";
+        }
+
+        return trimmed + "/";
+    }
+
+    // The inverse of NormalizeApiBaseUrl: the plain web host (no /api/v3), used only for the
+    // ".diff" web-UI download fallback below - the same URL shape a browser hits when a user clicks
+    // "Download" on a PR page, as opposed to the REST API.
+    private static string DeriveWebBaseUrl(string? apiBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(apiBaseUrl) || apiBaseUrl.Contains("api.github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return "https://github.com/";
+        }
+
+        var trimmed = apiBaseUrl.TrimEnd('/');
+        if (trimmed.EndsWith("/api/v3", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[..^"/api/v3".Length];
         }
 
         return trimmed + "/";
@@ -149,9 +170,12 @@ public class GitHubService : IGitHubService
     // having one. Requesting the diff media type instead returns the full unified diff as one
     // plain-text block, which isn't subject to that per-file omission.
     //
-    // Two different endpoints are tried because GitHub Enterprise Server versions vary in which one
+    // Three different sources are tried because GitHub Enterprise Server versions vary in which one
     // honors the "diff" media type reliably: the PR endpoint first, then the base...head compare
-    // endpoint as a fallback. Failures are logged (rather than silently swallowed) so a bad response
+    // endpoint, then - as a last resort - the same ".diff" URL a browser hits when a user clicks
+    // "Download" on the PR's web page. That last one isn't the documented REST API, but it's the
+    // one already confirmed to actually contain the diff on GHES instances where the two API-based
+    // attempts return nothing. Failures are logged (rather than silently swallowed) so a bad response
     // from a specific GHES instance is actually visible in the backend logs instead of just showing
     // up as "no diff" to the end user with no way to diagnose why.
     private async Task<string> TryGetRawDiffAsync(string owner, string repo, int prNumber, string baseSha, string headSha)
@@ -162,7 +186,13 @@ public class GitHubService : IGitHubService
             return diff;
         }
 
-        return await TryFetchDiffAsync($"repos/{owner}/{repo}/compare/{baseSha}...{headSha}", $"{owner}/{repo}#{prNumber} (compare endpoint)");
+        diff = await TryFetchDiffAsync($"repos/{owner}/{repo}/compare/{baseSha}...{headSha}", $"{owner}/{repo}#{prNumber} (compare endpoint)");
+        if (!string.IsNullOrEmpty(diff))
+        {
+            return diff;
+        }
+
+        return await TryFetchDiffAsync($"{_webBaseUrl}{owner}/{repo}/pull/{prNumber}.diff", $"{owner}/{repo}#{prNumber} (web .diff URL)");
     }
 
     private async Task<string> TryFetchDiffAsync(string relativeUrl, string logContext)
