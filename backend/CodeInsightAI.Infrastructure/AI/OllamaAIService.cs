@@ -51,13 +51,16 @@ public class OllamaAIService : IAIService
         // gets to the (more complete) raw diff section below. Only fall back to per-file patches when
         // there's no raw diff to rely on.
         var hasRawDiff = !string.IsNullOrWhiteSpace(context.RawDiff);
+        var hasAnyPatch = context.Files.Any(f => !string.IsNullOrWhiteSpace(f.Patch));
+        var diffMissing = !hasRawDiff && !hasAnyPatch;
 
         var filesSection = new StringBuilder();
         foreach (var file in context.Files)
         {
             filesSection.AppendLine($"### Dosya: {file.FileName}");
 
-            if (!hasRawDiff)
+            // Only show a per-file patch when there's no raw diff AND this file actually has one.
+            if (!hasRawDiff && !string.IsNullOrWhiteSpace(file.Patch))
             {
                 filesSection.AppendLine("Diff (patch):");
                 filesSection.AppendLine("```diff");
@@ -67,7 +70,7 @@ public class OllamaAIService : IAIService
 
             if (!string.IsNullOrWhiteSpace(file.FullContent))
             {
-                filesSection.AppendLine("PR sonrası tam dosya içeriği (tutarlılık analizi için bağlam):");
+                filesSection.AppendLine("Dosyanın güncel (PR sonrası) tam içeriği:");
                 filesSection.AppendLine("```");
                 filesSection.AppendLine(Truncate(file.FullContent, 15000));
                 filesSection.AppendLine("```");
@@ -75,6 +78,14 @@ public class OllamaAIService : IAIService
 
             filesSection.AppendLine();
         }
+
+        // When the diff genuinely couldn't be fetched, the full file contents above are all we have -
+        // steer the model to review them instead of giving up with a "no diff" verdict.
+        var diffMissingNote = diffMissing
+            ? @"NOT: Bu PR için satır-bazlı diff (patch) sağlanamadı. Aşağıda değişen dosyaların PR SONRASI TAM İÇERİKLERİ verilmiştir. İncelemeni bu tam dosya içeriklerine dayandır; 'diff yok, analiz edilemiyor' DEME - eldeki tam kodu değerlendirerek bug, güvenlik, performans ve kod kalitesi analizini yine de yap.
+
+"
+            : string.Empty;
 
         var rawDiffSection = string.IsNullOrWhiteSpace(context.RawDiff)
             ? string.Empty
@@ -94,7 +105,7 @@ Branch: {context.HeadBranch} -> {context.BaseBranch}
 PR Açıklaması:
 {(string.IsNullOrWhiteSpace(context.PrDescription) ? "(açıklama girilmemiş)" : context.PrDescription)}
 
-{rawDiffSection}Değişen dosyalar ({context.Files.Count} adet):
+{diffMissingNote}{rawDiffSection}Değişen dosyalar ({context.Files.Count} adet):
 
 {filesSection}";
 

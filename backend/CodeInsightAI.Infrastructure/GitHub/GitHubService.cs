@@ -9,9 +9,12 @@ namespace CodeInsightAI.Infrastructure.GitHub;
 
 public class GitHubService : IGitHubService
 {
-    // Full file content is only fetched (for project-wide consistency checks) when the
-    // PR touches a manageable number of files, to keep the AI prompt/token usage bounded.
+    // Full file content is normally just a bounded enrichment (project-wide consistency checks) on
+    // top of the diff, so it's only fetched for a manageable number of files to keep prompt/token
+    // usage down. But when no diff comes through at all (see below), the file-contents API is the
+    // ONLY window into the actual code, so a much higher cap applies in that fallback case.
     private const int MaxFilesForFullContent = 15;
+    private const int MaxFilesForContentFallback = 60;
     private const int MaxFileSizeBytesForFullContent = 50_000;
 
     private readonly HttpClient _httpClient;
@@ -128,15 +131,34 @@ public class GitHubService : IGitHubService
         filesResponse.EnsureSuccessStatusCode();
         var files = await filesResponse.Content.ReadFromJsonAsyncSafe<List<GitHubPullRequestFile>>(_jsonOptions) ?? new();
 
-        var fetchFullContent = files.Count <= MaxFilesForFullContent;
+        // Fetch the unified diff up front, because whether we also need each file's full content
+        // depends on whether we actually got a diff. Some GHES setups omit every per-file patch AND
+        // don't serve the .diff media type - when that happens the diff is effectively gone, so the
+        // file-contents API becomes our only source of the real code and we fetch it even for larger
+        // PRs (still capped so a huge PR can't fire hundreds of contents-API calls).
+        var rawDiff = await TryGetRawDiffAsync(owner, repo, prNumber, pr.Base.Sha, pr.Head.Sha);
+        var diffAvailable = !string.IsNullOrWhiteSpace(rawDiff) || files.Any(f => !string.IsNullOrWhiteSpace(f.Patch));
+
+        var fileLimit = diffAvailable ? MaxFilesForFullContent : MaxFilesForContentFallback;
+        var fetchFullContent = files.Count <= fileLimit;
+
+        if (!diffAvailable)
+        {
+            _logger.LogWarning(
+                "No diff available for {Owner}/{Repo}#{Pr} ({FileCount} files); falling back to file contents API (fetch={Fetch}).",
+                owner, repo, prNumber, files.Count, fetchFullContent);
+        }
 
         var fileChanges = new List<PullRequestFileChange>();
         foreach (var file in files)
         {
             var change = new PullRequestFileChange
             {
+                // Leave the patch empty rather than injecting a "no diff" placeholder - that
+                // placeholder used to end up in the prompt and made the AI conclude it couldn't
+                // review anything, even when full file content was available below.
                 FileName = file.FileName,
-                Patch = file.Patch ?? "(binary dosya veya diff mevcut değil)"
+                Patch = file.Patch ?? string.Empty
             };
 
             if (fetchFullContent && file.Status != "removed")
@@ -160,7 +182,7 @@ public class GitHubService : IGitHubService
             HeadBranch = pr.Head.Ref,
             HeadSha = pr.Head.Sha,
             Files = fileChanges,
-            RawDiff = await TryGetRawDiffAsync(owner, repo, prNumber, pr.Base.Sha, pr.Head.Sha)
+            RawDiff = rawDiff
         };
     }
 
